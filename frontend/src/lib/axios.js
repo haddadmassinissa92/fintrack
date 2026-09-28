@@ -1,17 +1,16 @@
 // lib/axios.js
 //
-// Instance axios partagée : withCredentials permet d'envoyer/recevoir le
-// cookie httpOnly du backend malgré le fait que frontend et backend sont
-// sur des domaines différents (Vercel vs Render).
+// Instance axios partagée. baseURL relative ("/api") : Next.js redirige
+// ces requêtes vers le backend Render côté serveur (voir next.config.ts).
+// Pour le navigateur, tout reste sur le même domaine que le site — le
+// cookie httpOnly du backend est donc traité comme un cookie de première
+// partie, et n'est plus bloqué par les protections anti cookies tiers de
+// Chrome/Safari (ce qui arrivait quand on appelait directement le domaine
+// Render depuis Vercel).
 
 import axios from "axios";
 
-const BASE_URL =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:5002/api"
-    : process.env.NEXT_PUBLIC_API_URL;
-
 export const axiosInstance = axios.create({
-  baseURL: BASE_URL,
+  baseURL: "/api",
   withCredentials: true,
 });
