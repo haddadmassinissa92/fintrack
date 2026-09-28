@@ -11,15 +11,50 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "FinTrack — Gérez vos finances",
-  description: "Suivez vos revenus et dépenses, comprenez où va votre argent, et avancez vers vos objectifs financiers.",
+  metadataBase: new URL("https://fintrack-frontend-beta.vercel.app"),
+  title: {
+    default: "FinTrack — Gérez vos finances",
+    template: "%s · FinTrack",
+  },
+  description:
+    "Suivez vos revenus et dépenses, comprenez où va votre argent, et avancez vers vos objectifs financiers.",
+  applicationName: "FinTrack",
+  keywords: [
+    "gestion budget",
+    "suivi des dépenses",
+    "finances personnelles",
+    "épargne",
+    "budget en ligne",
+  ],
+  authors: [{ name: "Massinissa Haddad" }],
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    siteName: "FinTrack",
+    title: "FinTrack — Gérez vos finances",
+    description:
+      "Suivez vos revenus et dépenses, comprenez où va votre argent, et avancez vers vos objectifs financiers.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FinTrack — Gérez vos finances",
+    description:
+      "Suivez vos revenus et dépenses, comprenez où va votre argent, et avancez vers vos objectifs financiers.",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="fr" className={inter.variable} suppressHydrationWarning>
+    <html lang="fr" className={inter.variable}>
       <head>
         {/* Applique le thème sauvegardé avant le premier rendu, pour
             éviter un flash de thème clair puis sombre au chargement */}
