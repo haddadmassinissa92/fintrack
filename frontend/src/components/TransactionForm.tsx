@@ -114,7 +114,7 @@ export default function TransactionForm({ onClose }: { onClose: () => void }) {
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-1 bg-transparent text-sm"
+          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-1 bg-white dark:bg-zinc-900 text-sm"
         >
           <option value="">Choisir...</option>
           {availableCategories.map((c: string) => (

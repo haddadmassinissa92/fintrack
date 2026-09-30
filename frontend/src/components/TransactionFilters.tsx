@@ -42,7 +42,7 @@ export default function TransactionFilters({
       <select
         value={filters.type}
         onChange={(e) => onChange({ ...filters, type: e.target.value, category: "" })}
-        className="border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-transparent text-sm"
+        className="border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm"
       >
         <option value="">Tous types</option>
         <option value="revenu">Revenus</option>
@@ -52,7 +52,7 @@ export default function TransactionFilters({
       <select
         value={filters.category}
         onChange={(e) => onChange({ ...filters, category: e.target.value })}
-        className="border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-transparent text-sm"
+        className="border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm"
       >
         <option value="">Toutes catégories</option>
         {allCategories.map((c) => (

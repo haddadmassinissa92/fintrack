@@ -133,7 +133,7 @@ export default function CategoryManager({ onClose }: { onClose: () => void }) {
                       onChange={(e) =>
                         setCategoryBudgetType(cat._id, e.target.value || null)
                       }
-                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md bg-transparent px-1 py-0.5"
+                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-900 px-1 py-0.5"
                     >
                       <option value="">Non classé</option>
                       <option value="besoin">Besoin</option>
