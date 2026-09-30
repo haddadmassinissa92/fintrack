@@ -8,6 +8,11 @@ export const useTransactionStore = create((set, get) => ({
   stats: null,
   categories: { expense: [], income: [], all: [] },
   isLoading: false,
+  isLoadingMore: false,
+  page: 1,
+  total: 0,
+  hasMore: false,
+  lastFilters: {},
 
   getCategories: async () => {
     try {
@@ -60,8 +65,10 @@ export const useTransactionStore = create((set, get) => ({
     }
   },
 
+  // Recharge toujours depuis la page 1 — utilisé au premier chargement et
+  // à chaque changement de filtre. Voir loadMoreTransactions pour la suite.
   getTransactions: async (filters = {}) => {
-    set({ isLoading: true });
+    set({ isLoading: true, lastFilters: filters });
     try {
       const params = new URLSearchParams();
       if (filters.type) params.set("type", filters.type);
@@ -69,13 +76,49 @@ export const useTransactionStore = create((set, get) => ({
       if (filters.search) params.set("search", filters.search);
       if (filters.month) params.set("month", filters.month);
       if (filters.year) params.set("year", filters.year);
+      params.set("page", "1");
 
       const res = await axiosInstance.get(`/transactions?${params.toString()}`);
-      set({ transactions: res.data });
+      set({
+        transactions: res.data.transactions,
+        total: res.data.total,
+        page: res.data.page,
+        hasMore: res.data.hasMore,
+      });
     } catch (error) {
       console.error(error);
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  // Ajoute la page suivante à la liste déjà affichée, avec les mêmes
+  // filtres que le dernier chargement (bouton "Charger plus")
+  loadMoreTransactions: async () => {
+    const { hasMore, isLoadingMore, page, lastFilters, transactions } = get();
+    if (!hasMore || isLoadingMore) return;
+
+    set({ isLoadingMore: true });
+    try {
+      const params = new URLSearchParams();
+      if (lastFilters.type) params.set("type", lastFilters.type);
+      if (lastFilters.category) params.set("category", lastFilters.category);
+      if (lastFilters.search) params.set("search", lastFilters.search);
+      if (lastFilters.month) params.set("month", lastFilters.month);
+      if (lastFilters.year) params.set("year", lastFilters.year);
+      params.set("page", String(page + 1));
+
+      const res = await axiosInstance.get(`/transactions?${params.toString()}`);
+      set({
+        transactions: [...transactions, ...res.data.transactions],
+        total: res.data.total,
+        page: res.data.page,
+        hasMore: res.data.hasMore,
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      set({ isLoadingMore: false });
     }
   },
 
@@ -91,7 +134,10 @@ export const useTransactionStore = create((set, get) => ({
   addTransaction: async (data) => {
     try {
       const res = await axiosInstance.post("/transactions", data);
-      set({ transactions: [res.data, ...get().transactions] });
+      set({
+        transactions: [res.data, ...get().transactions],
+        total: get().total + 1,
+      });
       get().getStats();
       return { success: true };
     } catch (error) {
@@ -102,7 +148,10 @@ export const useTransactionStore = create((set, get) => ({
   deleteTransaction: async (id) => {
     try {
       await axiosInstance.delete(`/transactions/${id}`);
-      set({ transactions: get().transactions.filter((t) => t._id !== id) });
+      set({
+        transactions: get().transactions.filter((t) => t._id !== id),
+        total: Math.max(0, get().total - 1),
+      });
       get().getStats();
       return { success: true };
     } catch (error) {

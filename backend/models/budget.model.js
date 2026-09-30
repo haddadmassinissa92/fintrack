@@ -27,6 +27,19 @@ const budgetSchema = new mongoose.Schema(
       required: true,
       min: 0.01,
     },
+    // Dernier palier d'alerte déjà envoyé par email pour ce budget, et le
+    // mois correspondant (ex. "2026-09") — évite de renvoyer le même email
+    // en boucle tant que le dépassement dure, et se réinitialise tout
+    // seul dès qu'un nouveau mois commence.
+    lastAlertMonth: {
+      type: String,
+      default: null,
+    },
+    lastAlertLevel: {
+      type: String,
+      enum: ["warning", "over", null],
+      default: null,
+    },
   },
   { timestamps: true },
 );

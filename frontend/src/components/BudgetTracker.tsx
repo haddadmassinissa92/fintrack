@@ -37,6 +37,11 @@ export default function BudgetTracker({ currency }: { currency: string }) {
     (c: string) => !budgetedCategories.includes(c),
   );
 
+  const overCount = budgets.filter((b: Budget) => b.spent > b.monthlyLimit).length;
+  const warningCount = budgets.filter(
+    (b: Budget) => b.spent <= b.monthlyLimit && b.spent / b.monthlyLimit >= 0.8,
+  ).length;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -70,6 +75,16 @@ export default function BudgetTracker({ currency }: { currency: string }) {
         </button>
       </div>
 
+      {(overCount > 0 || warningCount > 0) && (
+        <p className="text-xs rounded-lg px-3 py-2 mb-3 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400">
+          {overCount > 0 &&
+            `${overCount} budget${overCount > 1 ? "s" : ""} dépassé${overCount > 1 ? "s" : ""}`}
+          {overCount > 0 && warningCount > 0 && " · "}
+          {warningCount > 0 &&
+            `${warningCount} budget${warningCount > 1 ? "s" : ""} proche${warningCount > 1 ? "s" : ""} de la limite`}
+        </p>
+      )}
+
       {budgets.length === 0 ? (
         <p className="text-sm text-zinc-400 text-center py-6">
           Aucun budget défini. Fixe une limite mensuelle sur une catégorie pour suivre tes dépenses par rapport à elle.
@@ -79,6 +94,20 @@ export default function BudgetTracker({ currency }: { currency: string }) {
           {budgets.map((b: Budget) => {
             const percent = Math.min(100, Math.round((b.spent / b.monthlyLimit) * 100));
             const isOver = b.spent > b.monthlyLimit;
+            // Palier intermédiaire : à partir de 80% mais avant le
+            // dépassement, on prévient sans encore traiter ça comme une
+            // erreur — le rouge est réservé au dépassement réel.
+            const isWarning = !isOver && b.spent / b.monthlyLimit >= 0.8;
+            const barColor = isOver
+              ? "bg-expense-600"
+              : isWarning
+                ? "bg-amber-500"
+                : "bg-accent-500";
+            const textColor = isOver
+              ? "text-expense-600 font-medium"
+              : isWarning
+                ? "text-amber-600 dark:text-amber-500 font-medium"
+                : "text-zinc-500";
             return (
               <div key={b._id}>
                 <div className="flex items-center justify-between mb-1">
@@ -93,15 +122,14 @@ export default function BudgetTracker({ currency }: { currency: string }) {
                 </div>
                 <div className="w-full h-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-1">
                   <div
-                    className={`h-full rounded-full transition-all ${
-                      isOver ? "bg-expense-600" : "bg-accent-500"
-                    }`}
+                    className={`h-full rounded-full transition-all ${barColor}`}
                     style={{ width: `${percent}%` }}
                   />
                 </div>
-                <p className={`text-xs ${isOver ? "text-expense-600 font-medium" : "text-zinc-500"}`}>
+                <p className={`text-xs ${textColor}`}>
                   {formatAmount(b.spent, currency)} / {formatAmount(b.monthlyLimit, currency)} ({percent}%)
                   {isOver && " — dépassé"}
+                  {isWarning && " — attention, bientôt atteint"}
                 </p>
               </div>
             );

@@ -48,6 +48,9 @@ exports.createTransaction = async (req, res) => {
 
 // Liste les transactions de l'utilisateur, plus récentes en premier.
 // Filtres optionnels par mois précis (?month=9&year=2026) et par type.
+// Pagination optionnelle (?page=1&limit=20) : sans ces paramètres, page=1
+// et limit=20 s'appliquent par défaut — la route ne renvoie donc jamais
+// toutes les transactions d'un coup, même si l'appelant les omet.
 exports.getTransactions = async (req, res) => {
   try {
     const { month, year, type, category, search } = req.query;
@@ -68,8 +71,22 @@ exports.getTransactions = async (req, res) => {
       filter.date = { $gte: start, $lt: end };
     }
 
-    const transactions = await Transaction.find(filter).sort({ date: -1 });
-    res.status(200).json(transactions);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [transactions, total] = await Promise.all([
+      Transaction.find(filter).sort({ date: -1 }).skip(skip).limit(limit),
+      Transaction.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      transactions,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit) || 1,
+      hasMore: skip + transactions.length < total,
+    });
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la récupération des transactions");
     res.status(500).json({ message: "Erreur serveur." });

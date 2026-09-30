@@ -21,8 +21,18 @@ import TransactionFilters from "@/components/TransactionFilters";
 export default function DashboardPage() {
   const router = useRouter();
   const { authUser, isCheckingAuth, checkAuth } = useAuthStore();
-  const { transactions, stats, categories, getTransactions, getStats, getCategories, exportTransactions } =
-    useTransactionStore();
+  const {
+    transactions,
+    stats,
+    categories,
+    getTransactions,
+    loadMoreTransactions,
+    hasMore,
+    isLoadingMore,
+    getStats,
+    getCategories,
+    exportTransactions,
+  } = useTransactionStore();
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({ search: "", type: "", category: "" });
 
@@ -135,6 +145,17 @@ export default function DashboardPage() {
           </div>
           <TransactionFilters filters={filters} onChange={setFilters} categories={categories} />
           <TransactionList transactions={transactions} currency={currency} />
+          {hasMore && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() => loadMoreTransactions()}
+                disabled={isLoadingMore}
+                className="text-sm text-zinc-500 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2 transition disabled:opacity-50"
+              >
+                {isLoadingMore ? "Chargement..." : "Charger plus"}
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
