@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 
 // Police Google chargée localement par Next.js (pas de requête externe au
 // chargement de la page, tout est intégré au build) — bien plus soignée
@@ -48,6 +49,17 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "FinTrack",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#059669",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -70,7 +82,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <RegisterServiceWorker />
+        {children}
+      </body>
     </html>
   );
 }
