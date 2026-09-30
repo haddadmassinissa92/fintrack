@@ -33,10 +33,39 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Réseau d'abord, cache en secours — pour une app de finances à jour,
-  // mieux vaut privilégier les données fraîches et ne dépanner que si le
-  // réseau est indisponible.
+  const { request } = event;
+
+  // Ne jamais intercepter les requêtes non-GET (connexion, création de
+  // transaction, etc.) : elles doivent toujours atteindre directement le
+  // serveur, sans passer par cette logique de cache/secours.
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+
+  // Les appels à l'API ne sont jamais mis en cache : les données
+  // financières doivent toujours être fraîches, jamais une version
+  // périmée servie hors-ligne.
+  if (url.pathname.startsWith("/api/")) return;
+
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request)),
+    fetch(request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        return response;
+      })
+      .catch(async () => {
+        const cached = await caches.match(request);
+        // Toujours renvoyer une vraie Response, jamais `undefined` —
+        // sinon le navigateur lève une erreur ("Failed to convert value
+        // to 'Response'") au lieu d'afficher une page de secours.
+        return (
+          cached ??
+          new Response("Hors ligne", {
+            status: 503,
+            statusText: "Service indisponible hors ligne",
+          })
+        );
+      }),
   );
 });
