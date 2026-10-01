@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wallet, LogOut, Moon, Sun, Bell } from "lucide-react";
+import { Wallet, LogOut, Moon, Sun, Bell, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useBudgetStore } from "@/store/useBudgetStore";
@@ -108,6 +108,13 @@ export default function Navbar() {
           className="text-zinc-400 hover:text-accent-600 transition p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
         >
           {isDark ? <Sun size={18} strokeWidth={2} /> : <Moon size={18} strokeWidth={2} />}
+        </button>
+        <button
+          onClick={() => router.push("/settings")}
+          aria-label="Paramètres"
+          className="text-zinc-400 hover:text-accent-600 transition p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        >
+          <Settings size={18} strokeWidth={2} />
         </button>
         <button
           onClick={handleLogout}
