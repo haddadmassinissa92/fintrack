@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings as SettingsIcon, Check } from "lucide-react";
+import { Settings as SettingsIcon, Check, ArrowLeft } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import Navbar from "@/components/Navbar";
 
@@ -86,6 +86,14 @@ export default function SettingsPage() {
       <Navbar />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-accent-600 transition"
+        >
+          <ArrowLeft size={15} strokeWidth={2} />
+          Retour au tableau de bord
+        </button>
+
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <SettingsIcon size={20} className="text-accent-600" />

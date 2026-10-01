@@ -45,12 +45,16 @@ export default function Navbar() {
 
   return (
     <nav className="relative border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-2">
+      <button
+        onClick={() => router.push("/dashboard")}
+        className="flex items-center gap-2"
+        aria-label="Retour au tableau de bord"
+      >
         <div className="w-8 h-8 rounded-xl bg-accent-600 flex items-center justify-center">
           <Wallet size={16} className="text-white" strokeWidth={2} />
         </div>
         <span className="font-bold">FinTrack</span>
-      </div>
+      </button>
 
       <div className="flex items-center gap-3">
         <span className="text-sm text-zinc-500 hidden sm:inline">{authUser?.username}</span>
