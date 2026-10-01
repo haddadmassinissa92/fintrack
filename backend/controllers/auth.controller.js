@@ -8,6 +8,7 @@ const Category = require("../models/category.model");
 const { EXPENSE_CATEGORIES, INCOME_CATEGORIES, DEFAULT_BUDGET_TYPES } = require("../constants/categories");
 const logger = require("../logger");
 const { sendPasswordResetEmail } = require("../email.service");
+const { convertUserCurrency } = require("../currencyConversion.service");
 
 // Génère le jeton JWT (valable 30 jours) et le place dans un cookie
 // httpOnly — jamais lisible en JavaScript côté navigateur, donc protégé
@@ -124,8 +125,13 @@ exports.checkAuth = (req, res) => {
   res.status(200).json(req.user);
 };
 
-// Change la devise d'affichage préférée de l'utilisateur (purement un
-// libellé, aucune conversion de montants réels)
+// Change la devise de l'utilisateur ET convertit tous ses montants
+// existants (transactions, budgets, objectifs d'épargne, transactions
+// récurrentes) au taux de change actuel — contrairement à une simple
+// relabellisation, "5000 DZD" devient par ex. "32,50 EUR", pas "5000 EUR".
+// Si la récupération du taux échoue, rien n'est modifié : ni la devise,
+// ni les montants, pour ne jamais se retrouver avec un libellé qui ne
+// correspond plus aux chiffres réels.
 exports.updateCurrency = async (req, res) => {
   try {
     const { currency } = req.body;
@@ -133,11 +139,32 @@ exports.updateCurrency = async (req, res) => {
       return res.status(400).json({ message: "Devise invalide." });
     }
 
+    const newCurrency = currency.trim().toUpperCase();
     const user = await User.findById(req.user._id);
-    user.currency = currency.trim().toUpperCase();
+    const oldCurrency = user.currency;
+
+    if (newCurrency === oldCurrency) {
+      return res.status(200).json({ currency: user.currency, rate: 1 });
+    }
+
+    let rate;
+    try {
+      ({ rate } = await convertUserCurrency(req.user._id, oldCurrency, newCurrency));
+    } catch (conversionError) {
+      logger.error(
+        { err: conversionError },
+        "Erreur lors de la conversion de devise — devise et montants laissés inchangés",
+      );
+      return res.status(502).json({
+        message:
+          "Impossible de récupérer le taux de change actuel. Réessaie dans quelques instants.",
+      });
+    }
+
+    user.currency = newCurrency;
     await user.save();
 
-    res.status(200).json({ currency: user.currency });
+    res.status(200).json({ currency: user.currency, rate, from: oldCurrency, to: newCurrency });
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la mise à jour de la devise");
     res.status(500).json({ message: "Erreur serveur." });

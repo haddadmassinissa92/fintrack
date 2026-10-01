@@ -68,7 +68,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await axiosInstance.put("/auth/currency", { currency });
       set({ authUser: { ...get().authUser, currency: res.data.currency } });
-      return { success: true };
+      return { success: true, rate: res.data.rate, from: res.data.from, to: res.data.to };
     } catch (error) {
       return { success: false, message: error.response?.data?.message || "Erreur" };
     }

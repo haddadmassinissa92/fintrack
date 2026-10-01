@@ -67,7 +67,14 @@ export default function SettingsPage() {
     setIsSaving(false);
 
     if (result.success) {
-      setMessage({ type: "success", text: "Devise mise à jour." });
+      if (result.from && result.to && result.rate !== 1) {
+        setMessage({
+          type: "success",
+          text: `Conversion effectuée : 1 ${result.from} = ${result.rate.toFixed(6)} ${result.to}. Tous tes montants ont été mis à jour.`,
+        });
+      } else {
+        setMessage({ type: "success", text: "Devise mise à jour." });
+      }
     } else {
       setMessage({ type: "error", text: result.message });
     }
@@ -106,8 +113,10 @@ export default function SettingsPage() {
           <h2 className="font-semibold mb-1">Devise</h2>
           <p className="text-sm text-zinc-500 mb-4">
             Devise utilisée pour l&apos;affichage de tous tes montants — revenus, dépenses,
-            budgets et objectifs d&apos;épargne. Il ne s&apos;agit que d&apos;un affichage : FinTrack
-            ne convertit pas automatiquement entre devises.
+            budgets et objectifs d&apos;épargne. Changer de devise convertit automatiquement
+            tous tes montants existants au taux de change actuel (ex. tes dépenses en DZD
+            deviennent leur équivalent en EUR, pas juste le même chiffre avec un autre
+            symbole).
           </p>
 
           <form onSubmit={handleSubmit}>
@@ -163,7 +172,7 @@ export default function SettingsPage() {
               className="flex items-center gap-1.5 bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition"
             >
               <Check size={15} strokeWidth={2.5} />
-              {isSaving ? "Enregistrement..." : "Enregistrer"}
+              {isSaving ? "Conversion en cours..." : "Enregistrer"}
             </button>
           </form>
         </div>
