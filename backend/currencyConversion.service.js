@@ -15,26 +15,37 @@ const logger = require("./logger");
 
 // Taux de change via fxratesapi.com — gratuit, sans clé API, couvre le
 // DZD (contrairement à beaucoup d'API gratuites limitées aux devises
-// majeures). Si cet appel échoue (service indisponible, devise inconnue),
-// on préfère arrêter plutôt que convertir avec un taux arbitraire.
+// majeures). On ne change jamais la devise de base de la requête (ça fait
+// partie des fonctionnalités payantes de ce service) : on récupère les
+// deux taux par rapport à la devise de référence par défaut, puis on
+// calcule nous-mêmes le taux croisé — ça fonctionne quelle que soit cette
+// référence par défaut.
 async function getExchangeRate(from, to) {
   if (from === to) return 1;
 
-  const url = `https://api.fxratesapi.com/latest?base=${encodeURIComponent(from)}&currencies=${encodeURIComponent(to)}`;
+  const url = `https://api.fxratesapi.com/latest?symbols=${encodeURIComponent(from)},${encodeURIComponent(to)}`;
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`fxratesapi a répondu ${response.status}`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`fxratesapi a répondu ${response.status} : ${body}`);
   }
 
   const data = await response.json();
-  const rate = data?.rates?.[to];
+  const rateFrom = data?.rates?.[from];
+  const rateTo = data?.rates?.[to];
 
-  if (typeof rate !== "number" || !Number.isFinite(rate)) {
-    throw new Error(`Taux de change introuvable pour ${from} -> ${to}`);
+  if (typeof rateFrom !== "number" || typeof rateTo !== "number") {
+    throw new Error(
+      `Taux de change introuvable pour ${from} ou ${to} — réponse : ${JSON.stringify(data)}`,
+    );
   }
 
-  return rate;
+  // rateFrom et rateTo sont tous deux exprimés par rapport à la même
+  // devise de référence (ex. USD), donc leur rapport donne le taux
+  // croisé from -> to, sans jamais avoir besoin de changer cette
+  // référence nous-mêmes.
+  return rateTo / rateFrom;
 }
 
 // Multiplie par `rate` tous les montants de l'utilisateur, dans les 4
