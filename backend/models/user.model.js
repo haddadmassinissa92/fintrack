@@ -27,6 +27,12 @@ const userSchema = new mongoose.Schema(
     // Devise utilisée pour l'affichage des montants dans toute
     // l'application (pas de conversion réelle, purement un libellé
     // d'affichage choisi par l'utilisateur)
+    // Dernier mois ("2026-09") pour lequel le récapitulatif mensuel par
+    // email a déjà été envoyé — voir monthlyRecap.service.js
+    lastRecapMonth: {
+      type: String,
+      default: null,
+    },
     currency: {
       type: String,
       default: "DZD",

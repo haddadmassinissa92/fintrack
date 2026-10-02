@@ -16,7 +16,15 @@ function formatAmount(amount: number, currency: string) {
   return `${amount.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${currency}`;
 }
 
-export default function BudgetTracker({ currency }: { currency: string }) {
+export default function BudgetTracker({
+  currency,
+  month,
+  year,
+}: {
+  currency: string;
+  month?: number;
+  year?: number;
+}) {
   const { budgets, getBudgets, setBudget, deleteBudget } = useBudgetStore();
   const { categories, getCategories } = useTransactionStore();
   const [showForm, setShowForm] = useState(false);
@@ -25,9 +33,9 @@ export default function BudgetTracker({ currency }: { currency: string }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getBudgets();
+    getBudgets(month && year ? { month, year } : {});
     getCategories();
-  }, [getBudgets, getCategories]);
+  }, [getBudgets, getCategories, month, year]);
 
   // Catégories de dépense pas encore budgétées, pour éviter de proposer
   // dans le menu déroulant une catégorie déjà suivie (il suffit de

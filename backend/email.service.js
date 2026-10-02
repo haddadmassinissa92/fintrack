@@ -54,6 +54,71 @@ exports.sendPasswordResetEmail = async (to, resetUrl) => {
   }
 };
 
+// Récapitulatif envoyé automatiquement au début de chaque mois, pour le
+// mois qui vient de se terminer — voir monthlyRecap.service.js pour la
+// logique qui décide quand l'envoyer (une seule fois par mois).
+exports.sendMonthlyRecapEmail = async (
+  to,
+  { monthLabel, totalIncome, totalExpense, balance, transactionCount, topCategories, currency },
+) => {
+  try {
+    const fmt = (n) => n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+    const balanceColor = balance >= 0 ? "#059669" : "#dc2626";
+
+    const topCategoriesHtml = topCategories.length
+      ? topCategories
+          .map(
+            (c) =>
+              `<tr><td style="padding:4px 0;color:#374151;">${c.category}</td><td style="padding:4px 0;text-align:right;color:#374151;">${fmt(c.total)} ${currency}</td></tr>`,
+          )
+          .join("")
+      : `<tr><td style="padding:4px 0;color:#9ca3af;">Aucune dépense ce mois-ci</td></tr>`;
+
+    const response = await fetch(BREVO_URL, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "api-key": process.env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: "FinTrack", email: process.env.EMAIL_USER },
+        to: [{ email: to }],
+        subject: `FinTrack — Ton récapitulatif de ${monthLabel}`,
+        htmlContent: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #059669;">FinTrack</h2>
+            <p>Voici un résumé de <strong>${monthLabel}</strong> (${transactionCount} transaction${transactionCount > 1 ? "s" : ""}) :</p>
+
+            <table style="width:100%; border-collapse:collapse; margin:16px 0;">
+              <tr><td style="padding:4px 0;color:#374151;">Revenus</td><td style="padding:4px 0;text-align:right;color:#059669;">+${fmt(totalIncome)} ${currency}</td></tr>
+              <tr><td style="padding:4px 0;color:#374151;">Dépenses</td><td style="padding:4px 0;text-align:right;color:#dc2626;">-${fmt(totalExpense)} ${currency}</td></tr>
+              <tr><td style="padding:8px 0 4px;font-weight:600;border-top:1px solid #e5e7eb;">Solde</td><td style="padding:8px 0 4px;text-align:right;font-weight:600;border-top:1px solid #e5e7eb;color:${balanceColor};">${balance >= 0 ? "+" : ""}${fmt(balance)} ${currency}</td></tr>
+            </table>
+
+            <p style="color: #374151; font-weight: 600; margin-bottom: 4px;">Principales catégories de dépense</p>
+            <table style="width:100%; border-collapse:collapse;">
+              ${topCategoriesHtml}
+            </table>
+
+            <p style="color: #6b7280; font-size: 14px; margin-top: 24px;">
+              Retrouve le détail complet sur ton tableau de bord FinTrack.
+            </p>
+          </div>
+        `,
+      }),
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(`Brevo a répondu ${response.status} : ${details}`);
+    }
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de l'envoi du récapitulatif mensuel");
+    throw error;
+  }
+};
+
 // Alerte un utilisateur par email quand une catégorie budgétée approche
 // (80%) ou dépasse (100%) sa limite mensuelle. `level` vaut "warning" ou
 // "over" — voir budgetAlert.service.js pour la logique qui décide quand

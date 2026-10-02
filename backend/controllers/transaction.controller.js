@@ -158,7 +158,14 @@ exports.deleteTransaction = async (req, res) => {
 exports.getStats = async (req, res) => {
   try {
     const userId = req.user._id;
-    const now = new Date();
+    // Le mois à afficher : celui demandé en query (?month=9&year=2026),
+    // sinon le mois en cours par défaut. "month" est 1-indexé côté API
+    // (comme getTransactions), pour rester cohérent avec le reste du code.
+    const { month, year } = req.query;
+    const now =
+      month && year
+        ? new Date(Number(year), Number(month) - 1, 1)
+        : new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -272,6 +279,8 @@ exports.getStats = async (req, res) => {
     });
 
     res.status(200).json({
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
       totalIncome,
       totalExpense,
       balance,

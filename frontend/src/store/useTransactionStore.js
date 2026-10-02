@@ -13,6 +13,7 @@ export const useTransactionStore = create((set, get) => ({
   total: 0,
   hasMore: false,
   lastFilters: {},
+  statsMonthYear: null,
 
   getCategories: async () => {
     try {
@@ -122,9 +123,17 @@ export const useTransactionStore = create((set, get) => ({
     }
   },
 
-  getStats: async () => {
+  getStats: async ({ month, year } = {}) => {
     try {
-      const res = await axiosInstance.get("/transactions/stats");
+      const params = new URLSearchParams();
+      if (month && year) {
+        params.set("month", month);
+        params.set("year", year);
+        set({ statsMonthYear: { month, year } });
+      } else {
+        set({ statsMonthYear: null });
+      }
+      const res = await axiosInstance.get(`/transactions/stats?${params.toString()}`);
       set({ stats: res.data });
     } catch (error) {
       console.error(error);
@@ -138,7 +147,7 @@ export const useTransactionStore = create((set, get) => ({
         transactions: [res.data, ...get().transactions],
         total: get().total + 1,
       });
-      get().getStats();
+      get().getStats(get().statsMonthYear || {});
       return { success: true };
     } catch (error) {
       return { success: false, message: error.response?.data?.message || "Erreur" };
@@ -152,7 +161,7 @@ export const useTransactionStore = create((set, get) => ({
         transactions: get().transactions.filter((t) => t._id !== id),
         total: Math.max(0, get().total - 1),
       });
-      get().getStats();
+      get().getStats(get().statsMonthYear || {});
       return { success: true };
     } catch (error) {
       return { success: false, message: error.response?.data?.message || "Erreur" };

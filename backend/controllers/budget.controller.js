@@ -10,7 +10,11 @@ const logger = require("../logger");
 exports.getBudgets = async (req, res) => {
   try {
     const userId = req.user._id;
-    const now = new Date();
+    const { month, year } = req.query;
+    const now =
+      month && year
+        ? new Date(Number(year), Number(month) - 1, 1)
+        : new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 

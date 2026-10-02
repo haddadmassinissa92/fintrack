@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Download } from "lucide-react";
+import { Plus, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import Navbar from "@/components/Navbar";
@@ -36,6 +36,45 @@ export default function DashboardPage() {
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({ search: "", type: "", category: "" });
 
+  // Mois actuellement consulté — par défaut le mois en cours. Naviguer
+  // vers un mois passé ne supprime ni ne réinitialise rien : ça change
+  // simplement la période affichée, exactement comme changer les filtres
+  // de la liste de transactions (qui supportent déjà month/year côté API).
+  const today = new Date();
+  const [viewedMonth, setViewedMonth] = useState(today.getMonth() + 1);
+  const [viewedYear, setViewedYear] = useState(today.getFullYear());
+  const isCurrentMonth =
+    viewedMonth === today.getMonth() + 1 && viewedYear === today.getFullYear();
+
+  const goToPrevMonth = () => {
+    if (viewedMonth === 1) {
+      setViewedMonth(12);
+      setViewedYear((y) => y - 1);
+    } else {
+      setViewedMonth((m) => m - 1);
+    }
+  };
+
+  const goToNextMonth = () => {
+    if (isCurrentMonth) return; // jamais naviguer dans le futur
+    if (viewedMonth === 12) {
+      setViewedMonth(1);
+      setViewedYear((y) => y + 1);
+    } else {
+      setViewedMonth((m) => m + 1);
+    }
+  };
+
+  const goToToday = () => {
+    setViewedMonth(today.getMonth() + 1);
+    setViewedYear(today.getFullYear());
+  };
+
+  const monthLabel = new Date(viewedYear, viewedMonth - 1, 1).toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+  });
+
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
@@ -48,10 +87,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (authUser) {
-      getStats();
+      getStats({ month: viewedMonth, year: viewedYear });
       getCategories();
     }
-  }, [authUser, getStats, getCategories]);
+  }, [authUser, getStats, getCategories, viewedMonth, viewedYear]);
 
   // Rejoue la recherche à chaque changement de filtre, avec une courte
   // pause après la frappe (debounce) pour ne pas interroger le serveur à
@@ -59,10 +98,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!authUser) return;
     const timeout = setTimeout(() => {
-      getTransactions(filters);
+      getTransactions({ ...filters, month: viewedMonth, year: viewedYear });
     }, 300);
     return () => clearTimeout(timeout);
-  }, [authUser, filters, getTransactions]);
+  }, [authUser, filters, viewedMonth, viewedYear, getTransactions]);
 
   if (isCheckingAuth || !authUser) {
     return (
@@ -79,10 +118,14 @@ export default function DashboardPage() {
       <Navbar />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold">Bonjour {authUser.username} 👋</h1>
-            <p className="text-sm text-zinc-500">Voici un aperçu de votre mois en cours</p>
+            <p className="text-sm text-zinc-500">
+              {isCurrentMonth
+                ? "Voici un aperçu de votre mois en cours"
+                : `Vue d'ensemble de ${monthLabel}`}
+            </p>
           </div>
           <button
             onClick={() => setShowForm(true)}
@@ -91,6 +134,35 @@ export default function DashboardPage() {
             <Plus size={16} strokeWidth={2.5} />
             Ajouter
           </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goToPrevMonth}
+            aria-label="Mois précédent"
+            className="p-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-accent-600 transition"
+          >
+            <ChevronLeft size={16} strokeWidth={2} />
+          </button>
+          <span className="text-sm font-medium capitalize min-w-[140px] text-center">
+            {monthLabel}
+          </span>
+          <button
+            onClick={goToNextMonth}
+            disabled={isCurrentMonth}
+            aria-label="Mois suivant"
+            className="p-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-accent-600 transition disabled:opacity-30 disabled:hover:text-zinc-500"
+          >
+            <ChevronRight size={16} strokeWidth={2} />
+          </button>
+          {!isCurrentMonth && (
+            <button
+              onClick={goToToday}
+              className="text-xs text-accent-600 hover:underline ml-1"
+            >
+              Aujourd&apos;hui
+            </button>
+          )}
         </div>
 
         {stats && (
@@ -116,7 +188,7 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SavingsGoals currency={currency} />
-          <BudgetTracker currency={currency} />
+          <BudgetTracker currency={currency} month={viewedMonth} year={viewedYear} />
         </div>
 
         <RecurringTransactions currency={currency} />
