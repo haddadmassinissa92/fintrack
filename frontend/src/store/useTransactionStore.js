@@ -14,6 +14,10 @@ export const useTransactionStore = create((set, get) => ({
   hasMore: false,
   lastFilters: {},
   statsMonthYear: null,
+  // Suppressions "en attente" : la transaction a déjà disparu de la liste
+  // affichée, mais la requête de suppression réelle n'est envoyée qu'après
+  // le délai d'annulation (voir UndoToasts.tsx pour l'affichage).
+  pendingDeletes: {},
 
   getCategories: async () => {
     try {
@@ -154,17 +158,67 @@ export const useTransactionStore = create((set, get) => ({
     }
   },
 
-  deleteTransaction: async (id) => {
+  // Supprime "visuellement" tout de suite (retrait de la liste), mais
+  // n'envoie la requête de suppression réelle qu'après un délai — le
+  // temps de laisser l'utilisateur annuler via le toast affiché.
+  deleteTransaction: (id) => {
+    const transaction = get().transactions.find((t) => t._id === id);
+    if (!transaction) return;
+
+    set({
+      transactions: get().transactions.filter((t) => t._id !== id),
+      total: Math.max(0, get().total - 1),
+    });
+
+    const timeoutId = setTimeout(() => get().finalizeDelete(id), 6000);
+    set({
+      pendingDeletes: {
+        ...get().pendingDeletes,
+        [id]: { transaction, timeoutId },
+      },
+    });
+  },
+
+  // Appelé par le bouton "Annuler" du toast : remet la transaction dans
+  // la liste et annule l'envoi de la suppression réelle
+  undoDelete: (id) => {
+    const pending = get().pendingDeletes[id];
+    if (!pending) return;
+
+    clearTimeout(pending.timeoutId);
+    const { [id]: _removed, ...rest } = get().pendingDeletes;
+
+    set({
+      transactions: [...get().transactions, pending.transaction].sort(
+        (a, b) => new Date(b.date) - new Date(a.date),
+      ),
+      total: get().total + 1,
+      pendingDeletes: rest,
+    });
+  },
+
+  // Appelé automatiquement une fois le délai d'annulation écoulé — envoie
+  // enfin la vraie suppression au serveur
+  finalizeDelete: async (id) => {
+    const pending = get().pendingDeletes[id];
+    if (!pending) return;
+
+    const { [id]: _removed, ...rest } = get().pendingDeletes;
+    set({ pendingDeletes: rest });
+
     try {
       await axiosInstance.delete(`/transactions/${id}`);
-      set({
-        transactions: get().transactions.filter((t) => t._id !== id),
-        total: Math.max(0, get().total - 1),
-      });
       get().getStats(get().statsMonthYear || {});
-      return { success: true };
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || "Erreur" };
+      console.error(error);
+      // La suppression a échoué côté serveur : on remet la transaction
+      // dans la liste plutôt que de laisser l'affichage mentir
+      set({
+        transactions: [...get().transactions, pending.transaction].sort(
+          (a, b) => new Date(b.date) - new Date(a.date),
+        ),
+        total: get().total + 1,
+      });
     }
   },
 

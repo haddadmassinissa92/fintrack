@@ -17,6 +17,7 @@ import BudgetPlanCard from "@/components/BudgetPlanCard";
 import TransactionList from "@/components/TransactionList";
 import TransactionForm from "@/components/TransactionForm";
 import TransactionFilters from "@/components/TransactionFilters";
+import UndoToasts from "@/components/UndoToasts";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -232,6 +233,7 @@ export default function DashboardPage() {
       </main>
 
       {showForm && <TransactionForm onClose={() => setShowForm(false)} />}
+      <UndoToasts />
     </div>
   );
 }
