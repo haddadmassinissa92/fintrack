@@ -156,8 +156,7 @@ exports.updateCurrency = async (req, res) => {
         "Erreur lors de la conversion de devise — devise et montants laissés inchangés",
       );
       return res.status(502).json({
-        message:
-          "Impossible de récupérer le taux de change actuel. Réessaie dans quelques instants.",
+        message: `Impossible de récupérer le taux de change actuel. Détail : ${conversionError.message}`,
       });
     }
 
