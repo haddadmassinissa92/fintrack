@@ -55,20 +55,36 @@ async function getExchangeRate(from, to) {
 async function convertUserAmounts(userId, rate) {
   const round2 = { $round: [{ $multiply: ["$amount", rate] }, 2] };
 
+  // Mongoose 9 exige updatePipeline:true explicitement dès que l'update
+  // est un tableau (pipeline d'agrégation) plutôt qu'un objet classique —
+  // sinon il refuse l'update par précaution, même si le tableau est
+  // valide.
+  const pipelineOption = { updatePipeline: true };
+
   await Promise.all([
-    Transaction.updateMany({ user: userId }, [{ $set: { amount: round2 } }]),
-    Budget.updateMany({ user: userId }, [
-      { $set: { monthlyLimit: { $round: [{ $multiply: ["$monthlyLimit", rate] }, 2] } } },
-    ]),
-    SavingsGoal.updateMany({ user: userId }, [
-      {
-        $set: {
-          targetAmount: { $round: [{ $multiply: ["$targetAmount", rate] }, 2] },
-          currentAmount: { $round: [{ $multiply: ["$currentAmount", rate] }, 2] },
+    Transaction.updateMany({ user: userId }, [{ $set: { amount: round2 } }], pipelineOption),
+    Budget.updateMany(
+      { user: userId },
+      [{ $set: { monthlyLimit: { $round: [{ $multiply: ["$monthlyLimit", rate] }, 2] } } }],
+      pipelineOption,
+    ),
+    SavingsGoal.updateMany(
+      { user: userId },
+      [
+        {
+          $set: {
+            targetAmount: { $round: [{ $multiply: ["$targetAmount", rate] }, 2] },
+            currentAmount: { $round: [{ $multiply: ["$currentAmount", rate] }, 2] },
+          },
         },
-      },
-    ]),
-    RecurringTransaction.updateMany({ user: userId }, [{ $set: { amount: round2 } }]),
+      ],
+      pipelineOption,
+    ),
+    RecurringTransaction.updateMany(
+      { user: userId },
+      [{ $set: { amount: round2 } }],
+      pipelineOption,
+    ),
   ]);
 }
 
