@@ -44,6 +44,16 @@ const transactionSchema = new mongoose.Schema(
       required: true,
       default: Date.now,
     },
+
+    // Photo du ticket/reçu, en data URI (ex. "data:image/jpeg;base64,...").
+    // Stockée directement dans le document plutôt que sur un service
+    // externe, pour rester simple — la taille est limitée côté
+    // contrôleur (voir transaction.controller.js) pour ne pas gonfler
+    // démesurément la base de données.
+    receiptImage: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true },
 );

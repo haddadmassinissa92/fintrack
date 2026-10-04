@@ -1,8 +1,39 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Camera, X } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import CategoryManager from "./CategoryManager";
+
+// Redimensionne et compresse une image côté navigateur avant envoi, pour
+// qu'une photo de téléphone (souvent plusieurs Mo) devienne une data URI
+// de quelques centaines de Ko — largement sous la limite du backend, et
+// beaucoup plus rapide à envoyer.
+function compressImage(file: File, maxWidth = 1000, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas non supporté par ce navigateur."));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => reject(new Error("Image invalide."));
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => reject(new Error("Lecture du fichier échouée."));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function TransactionForm({ onClose }: { onClose: () => void }) {
   const { categories, getCategories, addTransaction } = useTransactionStore();
@@ -15,6 +46,30 @@ export default function TransactionForm({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+
+  const handleReceiptChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permet de resélectionner le même fichier ensuite
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Le reçu doit être une image.");
+      return;
+    }
+
+    setIsCompressing(true);
+    try {
+      const compressed = await compressImage(file);
+      setReceiptImage(compressed);
+      setError("");
+    } catch {
+      setError("Impossible de traiter cette image.");
+    } finally {
+      setIsCompressing(false);
+    }
+  };
 
   useEffect(() => {
     getCategories();
@@ -41,6 +96,7 @@ export default function TransactionForm({ onClose }: { onClose: () => void }) {
       category,
       description,
       date,
+      receiptImage,
     });
     setIsSaving(false);
 
@@ -146,6 +202,40 @@ export default function TransactionForm({ onClose }: { onClose: () => void }) {
           onChange={(e) => setDate(e.target.value)}
           className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-6 bg-transparent text-sm"
         />
+
+        <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">
+          Reçu (optionnel)
+        </label>
+        {receiptImage ? (
+          <div className="relative inline-block mb-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={receiptImage}
+              alt="Aperçu du reçu"
+              className="h-20 w-20 object-cover rounded-lg border border-zinc-300 dark:border-zinc-700"
+            />
+            <button
+              type="button"
+              onClick={() => setReceiptImage(null)}
+              aria-label="Retirer le reçu"
+              className="absolute -top-2 -right-2 bg-zinc-900 text-white rounded-full p-1"
+            >
+              <X size={12} strokeWidth={2.5} />
+            </button>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-6 text-sm text-zinc-500 cursor-pointer hover:border-accent-500 transition w-fit">
+            <Camera size={15} strokeWidth={2} />
+            {isCompressing ? "Traitement..." : "Ajouter une photo"}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleReceiptChange}
+              disabled={isCompressing}
+              className="hidden"
+            />
+          </label>
+        )}
 
         <div className="flex gap-2">
           <button

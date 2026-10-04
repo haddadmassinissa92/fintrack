@@ -1,6 +1,7 @@
 "use client";
 
-import { Trash2, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { useState } from "react";
+import { Trash2, ArrowUpRight, ArrowDownRight, Paperclip, X } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
 
 type Transaction = {
@@ -10,6 +11,7 @@ type Transaction = {
   category: string;
   description: string;
   date: string;
+  receiptImage?: string | null;
 };
 
 export default function TransactionList({
@@ -20,6 +22,7 @@ export default function TransactionList({
   currency: string;
 }) {
   const deleteTransaction = useTransactionStore((state) => state.deleteTransaction);
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
   if (transactions.length === 0) {
     return (
@@ -67,6 +70,16 @@ export default function TransactionList({
             {t.amount.toLocaleString("fr-FR")} {currency}
           </p>
 
+          {t.receiptImage && (
+            <button
+              onClick={() => setViewingReceipt(t.receiptImage!)}
+              aria-label="Voir le reçu"
+              className="text-zinc-300 hover:text-accent-600 transition shrink-0"
+            >
+              <Paperclip size={16} strokeWidth={2} />
+            </button>
+          )}
+
           <button
             onClick={() => deleteTransaction(t._id)}
             aria-label="Supprimer"
@@ -76,6 +89,29 @@ export default function TransactionList({
           </button>
         </div>
       ))}
+
+      {viewingReceipt && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => setViewingReceipt(null)}
+        >
+          <div className="relative max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setViewingReceipt(null)}
+              aria-label="Fermer"
+              className="absolute -top-3 -right-3 bg-zinc-900 text-white rounded-full p-1.5"
+            >
+              <X size={14} strokeWidth={2.5} />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={viewingReceipt}
+              alt="Reçu"
+              className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

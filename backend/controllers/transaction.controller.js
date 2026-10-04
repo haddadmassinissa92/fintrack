@@ -13,15 +13,32 @@ const isValidCategory = async (userId, type, categoryName) => {
   return !!category;
 };
 
+// Limite la taille du reçu stocké (data URI complète, donc l'image
+// compressée est déjà censée être plus petite que ça côté frontend) —
+// 1.5 Mo de texte base64, soit environ 1.1 Mo d'image réelle. Suffisant
+// pour une photo de ticket compressée, sans risquer de gonfler les
+// documents MongoDB.
+const MAX_RECEIPT_LENGTH = 1_500_000;
+
+function isValidReceiptImage(receiptImage) {
+  if (receiptImage === undefined || receiptImage === null) return true;
+  if (typeof receiptImage !== "string") return false;
+  if (!receiptImage.startsWith("data:image/")) return false;
+  return receiptImage.length <= MAX_RECEIPT_LENGTH;
+}
+
 exports.createTransaction = async (req, res) => {
   try {
-    const { type, amount, category, description, date } = req.body;
+    const { type, amount, category, description, date, receiptImage } = req.body;
 
     if (!type || !amount || !category) {
       return res.status(400).json({ message: "Type, montant et catégorie sont requis." });
     }
     if (amount <= 0) {
       return res.status(400).json({ message: "Le montant doit être positif." });
+    }
+    if (!isValidReceiptImage(receiptImage)) {
+      return res.status(400).json({ message: "Image de reçu invalide ou trop volumineuse." });
     }
 
     // Une catégorie de revenu ne peut pas être utilisée sur une dépense,
@@ -37,6 +54,7 @@ exports.createTransaction = async (req, res) => {
       category,
       description: description?.trim() || "",
       date: date ? new Date(date) : new Date(),
+      receiptImage: receiptImage || null,
     });
 
     res.status(201).json(transaction);
@@ -105,7 +123,7 @@ exports.updateTransaction = async (req, res) => {
       return res.status(403).json({ message: "Action non autorisée." });
     }
 
-    const { type, amount, category, description, date } = req.body;
+    const { type, amount, category, description, date, receiptImage } = req.body;
 
     if (type) transaction.type = type;
     if (amount !== undefined) {
@@ -122,6 +140,14 @@ exports.updateTransaction = async (req, res) => {
     }
     if (description !== undefined) transaction.description = description.trim();
     if (date) transaction.date = new Date(date);
+    // null explicite = l'utilisateur a retiré le reçu ; undefined = champ
+    // non envoyé, donc on ne touche pas à la valeur existante
+    if (receiptImage !== undefined) {
+      if (receiptImage !== null && !isValidReceiptImage(receiptImage)) {
+        return res.status(400).json({ message: "Image de reçu invalide ou trop volumineuse." });
+      }
+      transaction.receiptImage = receiptImage;
+    }
 
     await transaction.save();
     res.status(200).json(transaction);
