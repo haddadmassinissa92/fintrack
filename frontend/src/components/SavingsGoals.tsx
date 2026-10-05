@@ -10,10 +10,38 @@ type Goal = {
   targetAmount: number;
   currentAmount: number;
   targetDate: string | null;
+  createdAt: string;
 };
 
 function formatAmount(amount: number, currency: string) {
   return `${amount.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${currency}`;
+}
+
+// Projection simple : extrapole le rythme moyen depuis la création de
+// l'objectif (montant actuel ÷ temps écoulé) pour estimer quand le
+// montant visé sera atteint. Pas d'historique détaillé des
+// contributions à disposition, donc c'est une moyenne globale, pas une
+// tendance récente — suffisant pour une estimation indicative.
+function getProjection(goal: Goal): { date: Date; behindSchedule: boolean } | null {
+  const now = new Date();
+  const createdAt = new Date(goal.createdAt);
+  const daysElapsed = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+
+  // Pas assez de recul pour extrapoler un rythme fiable, ou rien n'a
+  // encore été mis de côté
+  if (daysElapsed < 3 || goal.currentAmount <= 0) return null;
+  if (goal.currentAmount >= goal.targetAmount) return null;
+
+  const pacePerDay = goal.currentAmount / daysElapsed;
+  if (pacePerDay <= 0) return null;
+
+  const remaining = goal.targetAmount - goal.currentAmount;
+  const daysToGo = remaining / pacePerDay;
+  const projectedDate = new Date(now.getTime() + daysToGo * 24 * 60 * 60 * 1000);
+
+  const behindSchedule = goal.targetDate ? projectedDate > new Date(goal.targetDate) : false;
+
+  return { date: projectedDate, behindSchedule };
 }
 
 export default function SavingsGoals({ currency }: { currency: string }) {
@@ -84,6 +112,7 @@ export default function SavingsGoals({ currency }: { currency: string }) {
           {goals.map((goal: Goal) => {
             const percent = Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100));
             const isReached = goal.currentAmount >= goal.targetAmount;
+            const projection = isReached ? null : getProjection(goal);
             return (
               <div key={goal._id}>
                 <div className="flex items-center justify-between mb-1">
@@ -113,6 +142,20 @@ export default function SavingsGoals({ currency }: { currency: string }) {
                     <span>Visé pour le {new Date(goal.targetDate).toLocaleDateString("fr-FR")}</span>
                   )}
                 </div>
+
+                {projection && (
+                  <p
+                    className={`text-xs mt-0.5 ${
+                      projection.behindSchedule
+                        ? "text-amber-600 dark:text-amber-500"
+                        : "text-zinc-400"
+                    }`}
+                  >
+                    {projection.behindSchedule
+                      ? `À ce rythme, tu l'atteindras le ${projection.date.toLocaleDateString("fr-FR")} — après ton échéance`
+                      : `À ce rythme, tu l'atteindras le ${projection.date.toLocaleDateString("fr-FR")}`}
+                  </p>
+                )}
 
                 {contributingId === goal._id ? (
                   <div className="flex items-center gap-2 mt-2">
