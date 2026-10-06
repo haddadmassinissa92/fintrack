@@ -5,6 +5,10 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/user.model");
 const Category = require("../models/category.model");
+const Transaction = require("../models/transaction.model");
+const Budget = require("../models/budget.model");
+const SavingsGoal = require("../models/savingsGoal.model");
+const RecurringTransaction = require("../models/recurringTransaction.model");
 const { EXPENSE_CATEGORIES, INCOME_CATEGORIES, DEFAULT_BUDGET_TYPES } = require("../constants/categories");
 const logger = require("../logger");
 const { sendPasswordResetEmail } = require("../email.service");
@@ -231,6 +235,49 @@ exports.resetPassword = async (req, res) => {
     res.status(200).json({ message: "Mot de passe réinitialisé avec succès." });
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la réinitialisation du mot de passe");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Export complet de toutes les données de l'utilisateur en un seul
+// fichier JSON téléchargeable — transactions, budgets, objectifs
+// d'épargne, transactions récurrentes et catégories. Les photos de
+// reçus sont volontairement exclues : elles gonfleraient énormément le
+// fichier sans vraiment apporter de valeur de portabilité des données.
+exports.exportAccountData = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const [user, transactions, budgets, goals, recurring, categories] = await Promise.all([
+      User.findById(userId).select("-password"),
+      Transaction.find({ user: userId }).select("-receiptImage").sort({ date: -1 }),
+      Budget.find({ user: userId }),
+      SavingsGoal.find({ user: userId }),
+      RecurringTransaction.find({ user: userId }),
+      Category.find({ user: userId }),
+    ]);
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      account: {
+        username: user.username,
+        email: user.email,
+        currency: user.currency,
+        createdAt: user.createdAt,
+      },
+      transactions,
+      budgets,
+      savingsGoals: goals,
+      recurringTransactions: recurring,
+      categories,
+    };
+
+    const filename = `fintrack-export-${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(JSON.stringify(payload, null, 2));
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de l'export complet des données");
     res.status(500).json({ message: "Erreur serveur." });
   }
 };

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings as SettingsIcon, Check, ArrowLeft } from "lucide-react";
+import { Settings as SettingsIcon, Check, ArrowLeft, Download } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import Navbar from "@/components/Navbar";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
@@ -22,7 +22,17 @@ const COMMON_CURRENCIES = [
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { authUser, isCheckingAuth, checkAuth, updateCurrency } = useAuthStore();
+  const { authUser, isCheckingAuth, checkAuth, updateCurrency, exportAccountData } = useAuthStore();
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    setExportError("");
+    const res = await exportAccountData();
+    setIsExporting(false);
+    if (!res.success) setExportError(res.message);
+  };
   const [currency, setCurrency] = useState("DZD");
   const [customCurrency, setCustomCurrency] = useState("");
   const [isCustom, setIsCustom] = useState(false);
@@ -176,6 +186,30 @@ export default function SettingsPage() {
               {isSaving ? "Conversion en cours..." : "Enregistrer"}
             </button>
           </form>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
+          <h2 className="font-semibold mb-1">Exporter mes données</h2>
+          <p className="text-sm text-zinc-500 mb-4">
+            Télécharge un fichier contenant toutes tes données FinTrack : transactions,
+            budgets, objectifs d&apos;épargne, transactions récurrentes et catégories. Les
+            photos de reçus ne sont pas incluses, pour garder un fichier léger.
+          </p>
+
+          {exportError && (
+            <p className="text-sm bg-red-50 dark:bg-red-950/40 text-red-600 rounded-lg px-3 py-2 mb-4">
+              {exportError}
+            </p>
+          )}
+
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex items-center gap-1.5 border border-zinc-300 dark:border-zinc-700 hover:border-accent-500 hover:text-accent-600 disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition"
+          >
+            <Download size={15} strokeWidth={2} />
+            {isExporting ? "Préparation..." : "Télécharger toutes mes données (JSON)"}
+          </button>
         </div>
 
         <PushNotificationToggle />

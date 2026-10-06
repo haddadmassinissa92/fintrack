@@ -64,6 +64,25 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  exportAccountData: async () => {
+    try {
+      const res = await axiosInstance.get("/auth/export-data", { responseType: "blob" });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `fintrack-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
   updateCurrency: async (currency) => {
     try {
       const res = await axiosInstance.put("/auth/currency", { currency });
