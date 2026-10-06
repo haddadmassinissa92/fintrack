@@ -144,6 +144,21 @@ export const useTransactionStore = create((set, get) => ({
     }
   },
 
+  importTransactions: async (transactions) => {
+    try {
+      const res = await axiosInstance.post("/transactions/import", { transactions });
+      // Les transactions importées ne vont pas forcément toutes dans le
+      // mois actuellement affiché — on recharge simplement depuis la
+      // page 1 avec les filtres en cours plutôt que de les insérer
+      // manuellement dans la liste locale
+      await get().getTransactions(get().lastFilters);
+      get().getStats(get().statsMonthYear || {});
+      return { success: true, ...res.data };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
   addTransaction: async (data) => {
     try {
       const res = await axiosInstance.post("/transactions", data);

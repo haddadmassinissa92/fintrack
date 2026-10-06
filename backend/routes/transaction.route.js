@@ -8,6 +8,7 @@ const {
   deleteTransaction,
   getStats,
   exportTransactions,
+  importTransactions,
 } = require("../controllers/transaction.controller");
 const protectRoute = require("../middlewares/protectRoute");
 
@@ -20,6 +21,7 @@ router.get("/stats", getStats);
 router.get("/export", exportTransactions);
 router.get("/", getTransactions);
 router.post("/", createTransaction);
+router.post("/import", importTransactions);
 router.put("/:id", updateTransaction);
 router.delete("/:id", deleteTransaction);
 

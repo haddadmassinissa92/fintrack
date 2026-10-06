@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Download, Upload, ChevronLeft, ChevronRight } from "lucide-react";
+import ImportTransactions from "@/components/ImportTransactions";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import Navbar from "@/components/Navbar";
@@ -35,6 +36,7 @@ export default function DashboardPage() {
     exportTransactions,
   } = useTransactionStore();
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [filters, setFilters] = useState({ search: "", type: "", category: "" });
 
   // Mois actuellement consulté — par défaut le mois en cours. Naviguer
@@ -201,6 +203,13 @@ export default function DashboardPage() {
             <h2 className="font-semibold">Transactions</h2>
             <div className="flex gap-2">
               <button
+                onClick={() => setShowImport(true)}
+                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition"
+              >
+                <Upload size={13} strokeWidth={2} />
+                Importer
+              </button>
+              <button
                 onClick={() => exportTransactions("csv")}
                 className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition"
               >
@@ -233,6 +242,9 @@ export default function DashboardPage() {
       </main>
 
       {showForm && <TransactionForm onClose={() => setShowForm(false)} />}
+      {showImport && (
+        <ImportTransactions categories={categories} onClose={() => setShowImport(false)} />
+      )}
       <UndoToasts />
     </div>
   );

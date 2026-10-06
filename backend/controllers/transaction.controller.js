@@ -157,6 +157,76 @@ exports.updateTransaction = async (req, res) => {
   }
 };
 
+// Import en lot — le CSV est déjà analysé et mis en forme côté frontend
+// (délimiteur, colonnes, format de date tous gérés là-bas, car ils
+// varient trop d'une banque à l'autre pour être devinés côté serveur).
+// Chaque ligne est validée indépendamment : une ligne invalide est
+// ignorée et reportée, sans faire échouer tout l'import.
+exports.importTransactions = async (req, res) => {
+  try {
+    const { transactions } = req.body;
+
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return res.status(400).json({ message: "Aucune transaction à importer." });
+    }
+    if (transactions.length > 500) {
+      return res.status(400).json({ message: "500 transactions maximum par import." });
+    }
+
+    const toInsert = [];
+    const errors = [];
+
+    for (let i = 0; i < transactions.length; i++) {
+      const row = transactions[i];
+      const type = row.type;
+      const amount = Number(row.amount);
+      const category = row.category;
+      const date = row.date ? new Date(row.date) : null;
+
+      if (!type || !["revenu", "dépense"].includes(type)) {
+        errors.push({ row: i + 1, message: "Type invalide." });
+        continue;
+      }
+      if (!amount || amount <= 0) {
+        errors.push({ row: i + 1, message: "Montant invalide." });
+        continue;
+      }
+      if (!category) {
+        errors.push({ row: i + 1, message: "Catégorie manquante." });
+        continue;
+      }
+      if (!date || Number.isNaN(date.getTime())) {
+        errors.push({ row: i + 1, message: "Date invalide." });
+        continue;
+      }
+      if (!(await isValidCategory(req.user._id, type, category))) {
+        errors.push({ row: i + 1, message: `Catégorie "${category}" invalide pour ce type.` });
+        continue;
+      }
+
+      toInsert.push({
+        user: req.user._id,
+        type,
+        amount,
+        category,
+        description: (row.description || "").trim().slice(0, 200),
+        date,
+      });
+    }
+
+    const created = toInsert.length > 0 ? await Transaction.insertMany(toInsert) : [];
+
+    res.status(201).json({
+      imported: created.length,
+      skipped: errors.length,
+      errors: errors.slice(0, 20), // pas la peine de tout renvoyer si des centaines de lignes échouent
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de l'import de transactions");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
 exports.deleteTransaction = async (req, res) => {
   try {
     const { id } = req.params;
