@@ -11,6 +11,7 @@ const Budget = require("./models/budget.model");
 const Transaction = require("./models/transaction.model");
 const User = require("./models/user.model");
 const { sendBudgetAlertEmail } = require("./email.service");
+const { sendPushToUser } = require("./push.service");
 const logger = require("./logger");
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // toutes les 6 heures
@@ -81,6 +82,13 @@ async function checkBudgetAlerts() {
           monthlyLimit: budget.monthlyLimit,
           level,
           currency: user.currency || "DZD",
+        });
+
+        const percent = Math.round((spent / budget.monthlyLimit) * 100);
+        await sendPushToUser(budget.user, {
+          title: level === "over" ? `Budget "${budget.category}" dépassé` : `Budget "${budget.category}" bientôt atteint`,
+          body: `${percent}% de ta limite mensuelle utilisée.`,
+          url: "/dashboard",
         });
 
         budget.lastAlertMonth = monthKey;

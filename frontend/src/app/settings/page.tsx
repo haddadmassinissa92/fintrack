@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Settings as SettingsIcon, Check, ArrowLeft } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import Navbar from "@/components/Navbar";
+import PushNotificationToggle from "@/components/PushNotificationToggle";
 
 // Liste volontairement courte de devises courantes — l'utilisateur peut
 // toujours en saisir une autre via le champ libre juste en dessous.
@@ -176,6 +177,8 @@ export default function SettingsPage() {
             </button>
           </form>
         </div>
+
+        <PushNotificationToggle />
       </main>
     </div>
   );

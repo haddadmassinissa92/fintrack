@@ -32,6 +32,47 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Réception d'une notification push envoyée par le serveur (voir
+// push.service.js côté backend). Le payload est du JSON :
+// { title, body, url }.
+self.addEventListener("push", (event) => {
+  let data = { title: "FinTrack", body: "", url: "/dashboard" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    // payload non-JSON : on garde les valeurs par défaut plutôt que de
+    // planter l'affichage de la notification
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: data.url || "/dashboard" },
+    }),
+  );
+});
+
+// Clic sur la notification : ramène au premier plan un onglet FinTrack
+// déjà ouvert s'il y en a un, sinon en ouvre un nouveau
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/dashboard";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    }),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
