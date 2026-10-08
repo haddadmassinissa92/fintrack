@@ -182,7 +182,11 @@ export default function DashboardPage() {
 
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <CategoryChart data={stats.byCategory} currency={currency} />
+            <CategoryChart
+              data={stats.byCategory}
+              currency={currency}
+              categories={categories.all}
+            />
             <TrendChart data={stats.monthlyTrend} currency={currency} />
           </div>
         )}
@@ -226,7 +230,11 @@ export default function DashboardPage() {
             </div>
           </div>
           <TransactionFilters filters={filters} onChange={setFilters} categories={categories} />
-          <TransactionList transactions={transactions} currency={currency} />
+          <TransactionList
+            transactions={transactions}
+            currency={currency}
+            categories={categories.all}
+          />
           {hasMore && (
             <div className="flex justify-center mt-4">
               <button

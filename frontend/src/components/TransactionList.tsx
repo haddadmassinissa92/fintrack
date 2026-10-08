@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Trash2, ArrowUpRight, ArrowDownRight, Paperclip, X } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
+import { CategoryIcon } from "./categoryIcons";
 
 type Transaction = {
   _id: string;
@@ -14,12 +15,21 @@ type Transaction = {
   receiptImage?: string | null;
 };
 
+type CategoryDoc = {
+  name: string;
+  type: "revenu" | "dépense";
+  icon?: string;
+  color?: string;
+};
+
 export default function TransactionList({
   transactions,
   currency,
+  categories = [],
 }: {
   transactions: Transaction[];
   currency: string;
+  categories?: CategoryDoc[];
 }) {
   const deleteTransaction = useTransactionStore((state) => state.deleteTransaction);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
@@ -36,21 +46,30 @@ export default function TransactionList({
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden">
-      {transactions.map((t) => (
+      {transactions.map((t) => {
+        // Une transaction ne stocke que le NOM de sa catégorie : on
+        // retrouve ici l'icône/couleur correspondantes. Si la catégorie a
+        // été supprimée depuis, on retombe sur la flèche d'avant.
+        const categoryDoc = categories.find((c) => c.name === t.category && c.type === t.type);
+        return (
         <div key={t._id} className="flex items-center gap-3 p-4">
-          <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-              t.type === "revenu"
-                ? "bg-accent-50 dark:bg-accent-950 text-accent-600"
-                : "bg-red-50 dark:bg-red-950/40 text-expense-600"
-            }`}
-          >
-            {t.type === "revenu" ? (
-              <ArrowUpRight size={16} strokeWidth={2} />
-            ) : (
-              <ArrowDownRight size={16} strokeWidth={2} />
-            )}
-          </div>
+          {categoryDoc ? (
+            <CategoryIcon icon={categoryDoc.icon} color={categoryDoc.color} size={16} />
+          ) : (
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                t.type === "revenu"
+                  ? "bg-accent-50 dark:bg-accent-950 text-accent-600"
+                  : "bg-red-50 dark:bg-red-950/40 text-expense-600"
+              }`}
+            >
+              {t.type === "revenu" ? (
+                <ArrowUpRight size={16} strokeWidth={2} />
+              ) : (
+                <ArrowDownRight size={16} strokeWidth={2} />
+              )}
+            </div>
+          )}
 
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">
@@ -88,7 +107,8 @@ export default function TransactionList({
             <Trash2 size={16} strokeWidth={2} />
           </button>
         </div>
-      ))}
+        );
+      })}
 
       {viewingReceipt && (
         <div

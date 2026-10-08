@@ -9,7 +9,12 @@ const Transaction = require("../models/transaction.model");
 const Budget = require("../models/budget.model");
 const SavingsGoal = require("../models/savingsGoal.model");
 const RecurringTransaction = require("../models/recurringTransaction.model");
-const { EXPENSE_CATEGORIES, INCOME_CATEGORIES, DEFAULT_BUDGET_TYPES } = require("../constants/categories");
+const {
+  EXPENSE_CATEGORIES,
+  INCOME_CATEGORIES,
+  DEFAULT_BUDGET_TYPES,
+  DEFAULT_CATEGORY_STYLES,
+} = require("../constants/categories");
 const logger = require("../logger");
 const { sendPasswordResetEmail } = require("../email.service");
 const { convertUserCurrency } = require("../currencyConversion.service");
@@ -72,8 +77,14 @@ exports.signup = async (req, res) => {
         name,
         type: "dépense",
         budgetType: DEFAULT_BUDGET_TYPES[name] || null,
+        ...DEFAULT_CATEGORY_STYLES[name],
       })),
-      ...INCOME_CATEGORIES.map((name) => ({ user: newUser._id, name, type: "revenu" })),
+      ...INCOME_CATEGORIES.map((name) => ({
+        user: newUser._id,
+        name,
+        type: "revenu",
+        ...DEFAULT_CATEGORY_STYLES[name],
+      })),
     ];
     await Category.insertMany(defaultCategories);
 

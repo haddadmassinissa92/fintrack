@@ -6,7 +6,12 @@
 // une ancienne liste figée dans le code.
 
 const Category = require("../models/category.model");
+const { CATEGORY_ICONS } = require("../constants/categories");
 const logger = require("../logger");
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+const isValidIcon = (icon) => CATEGORY_ICONS.includes(icon);
+const isValidColor = (color) => HEX_COLOR.test(color);
 
 // Renvoie les catégories de l'utilisateur, séparées par type — pour
 // remplir les menus déroulants du formulaire d'ajout de transaction
@@ -29,7 +34,7 @@ exports.getCategories = async (req, res) => {
 
 exports.createCategory = async (req, res) => {
   try {
-    const { name, type, budgetType } = req.body;
+    const { name, type, budgetType, icon, color } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ message: "Le nom de la catégorie est requis." });
@@ -40,12 +45,21 @@ exports.createCategory = async (req, res) => {
     if (budgetType && !["besoin", "envie", "épargne"].includes(budgetType)) {
       return res.status(400).json({ message: "Classification invalide." });
     }
+    if (icon !== undefined && !isValidIcon(icon)) {
+      return res.status(400).json({ message: "Icône invalide." });
+    }
+    if (color !== undefined && !isValidColor(color)) {
+      return res.status(400).json({ message: "Couleur invalide." });
+    }
 
     const category = await Category.create({
       user: req.user._id,
       name: name.trim(),
       type,
       budgetType: type === "dépense" ? budgetType || null : null,
+      // undefined → Mongoose applique la valeur par défaut du modèle
+      icon,
+      color,
     });
 
     res.status(201).json(category);
@@ -66,7 +80,7 @@ exports.createCategory = async (req, res) => {
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, budgetType } = req.body;
+    const { name, budgetType, icon, color } = req.body;
 
     const category = await Category.findById(id);
     if (!category) {
@@ -87,6 +101,18 @@ exports.updateCategory = async (req, res) => {
         return res.status(400).json({ message: "Classification invalide." });
       }
       category.budgetType = budgetType;
+    }
+    if (icon !== undefined) {
+      if (!isValidIcon(icon)) {
+        return res.status(400).json({ message: "Icône invalide." });
+      }
+      category.icon = icon;
+    }
+    if (color !== undefined) {
+      if (!isValidColor(color)) {
+        return res.status(400).json({ message: "Couleur invalide." });
+      }
+      category.color = color;
     }
 
     await category.save();

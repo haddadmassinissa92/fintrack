@@ -3,19 +3,89 @@
 import { useState } from "react";
 import { Pencil, Trash2, Plus, Check, X } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
+import {
+  CategoryIcon,
+  CATEGORY_ICON_MAP,
+  CATEGORY_ICON_NAMES,
+  CATEGORY_COLORS,
+  DEFAULT_ICON,
+  DEFAULT_COLOR,
+} from "./categoryIcons";
 
 type CategoryDoc = {
   _id: string;
   name: string;
   type: "revenu" | "dépense";
   budgetType?: "besoin" | "envie" | "épargne" | null;
+  icon?: string;
+  color?: string;
 };
 
+// Sélecteur d'icône + couleur, partagé entre la modification d'une
+// catégorie existante et la création d'une nouvelle
+function StylePicker({
+  icon,
+  color,
+  onChange,
+}: {
+  icon: string;
+  color: string;
+  onChange: (style: { icon: string; color: string }) => void;
+}) {
+  return (
+    <div className="px-3 pb-3 pt-1 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg mb-1">
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {CATEGORY_COLORS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange({ icon, color: c })}
+            aria-label={`Couleur ${c}`}
+            className={`w-6 h-6 rounded-full transition ${
+              color === c ? "ring-2 ring-offset-2 ring-zinc-400 dark:ring-offset-zinc-900" : ""
+            }`}
+            style={{ backgroundColor: c }}
+          />
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {CATEGORY_ICON_NAMES.map((name) => {
+          const Icon = CATEGORY_ICON_MAP[name];
+          const selected = icon === name;
+          return (
+            <button
+              key={name}
+              type="button"
+              onClick={() => onChange({ icon: name, color })}
+              aria-label={name}
+              className={`p-1.5 rounded-lg flex items-center justify-center transition ${
+                selected ? "" : "text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+              style={selected ? { backgroundColor: `${color}26`, color } : undefined}
+            >
+              <Icon size={16} strokeWidth={2} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function CategoryManager({ onClose }: { onClose: () => void }) {
-  const { categories, createCategory, renameCategory, deleteCategory, setCategoryBudgetType } =
-    useTransactionStore();
+  const {
+    categories,
+    createCategory,
+    renameCategory,
+    deleteCategory,
+    setCategoryBudgetType,
+    setCategoryStyle,
+  } = useTransactionStore();
   const [type, setType] = useState<"dépense" | "revenu">("dépense");
   const [newName, setNewName] = useState("");
+  const [newStyle, setNewStyle] = useState({ icon: DEFAULT_ICON, color: DEFAULT_COLOR });
+  const [showNewPicker, setShowNewPicker] = useState(false);
+  const [stylingId, setStylingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [error, setError] = useState("");
@@ -26,9 +96,11 @@ export default function CategoryManager({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     setError("");
     if (!newName.trim()) return;
-    const result = await createCategory(newName.trim(), type);
+    const result = await createCategory(newName.trim(), type, newStyle.icon, newStyle.color);
     if (result.success) {
       setNewName("");
+      setNewStyle({ icon: DEFAULT_ICON, color: DEFAULT_COLOR });
+      setShowNewPicker(false);
     } else {
       setError(result.message);
     }
@@ -100,10 +172,18 @@ export default function CategoryManager({ onClose }: { onClose: () => void }) {
             <p className="text-sm text-zinc-400 text-center py-4">Aucune catégorie pour l&apos;instant.</p>
           )}
           {list.map((cat: CategoryDoc) => (
+            <div key={cat._id}>
             <div
-              key={cat._id}
               className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800"
             >
+              <button
+                type="button"
+                onClick={() => setStylingId(stylingId === cat._id ? null : cat._id)}
+                aria-label="Changer l'icône et la couleur"
+                className="shrink-0"
+              >
+                <CategoryIcon icon={cat.icon} color={cat.color} size={12} />
+              </button>
               {editingId === cat._id ? (
                 <>
                   <input
@@ -158,10 +238,34 @@ export default function CategoryManager({ onClose }: { onClose: () => void }) {
                 </>
               )}
             </div>
+            {stylingId === cat._id && (
+              <StylePicker
+                icon={cat.icon || DEFAULT_ICON}
+                color={cat.color || DEFAULT_COLOR}
+                onChange={(style) => setCategoryStyle(cat._id, style)}
+              />
+            )}
+            </div>
           ))}
         </div>
 
+        {showNewPicker && (
+          <StylePicker
+            icon={newStyle.icon}
+            color={newStyle.color}
+            onChange={setNewStyle}
+          />
+        )}
+
         <form onSubmit={handleAdd} className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setShowNewPicker((v) => !v)}
+            aria-label="Choisir l'icône et la couleur"
+            className="shrink-0 self-center"
+          >
+            <CategoryIcon icon={newStyle.icon} color={newStyle.color} size={14} />
+          </button>
           <input
             type="text"
             placeholder="Nouvelle catégorie..."

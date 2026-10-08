@@ -28,9 +28,20 @@ export const useTransactionStore = create((set, get) => ({
     }
   },
 
-  createCategory: async (name, type) => {
+  createCategory: async (name, type, icon, color) => {
     try {
-      await axiosInstance.post("/categories", { name, type });
+      await axiosInstance.post("/categories", { name, type, icon, color });
+      await get().getCategories();
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
+  // Change l'icône et/ou la couleur d'une catégorie existante
+  setCategoryStyle: async (id, { icon, color }) => {
+    try {
+      await axiosInstance.put(`/categories/${id}`, { icon, color });
       await get().getCategories();
       return { success: true };
     } catch (error) {

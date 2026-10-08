@@ -35,6 +35,17 @@ const categorySchema = new mongoose.Schema(
       enum: ["besoin", "envie", "épargne", null],
       default: null,
     },
+    // Apparence de la catégorie dans l'interface : nom d'un composant
+    // lucide-react (voir CATEGORY_ICONS dans constants/categories.js) et
+    // couleur hexadécimale (#rrggbb)
+    icon: {
+      type: String,
+      default: "Tag",
+    },
+    color: {
+      type: String,
+      default: "#71717a",
+    },
   },
   { timestamps: true },
 );

@@ -7,9 +7,11 @@ const COLORS = ["#059669", "#f59e0b", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899"
 export default function CategoryChart({
   data,
   currency,
+  categories = [],
 }: {
   data: { category: string; total: number }[];
   currency: string;
+  categories?: { name: string; type: string; color?: string }[];
 }) {
   if (!data || data.length === 0) {
     return (
@@ -35,9 +37,14 @@ export default function CategoryChart({
               `${category} ${((percent ?? 0) * 100).toFixed(0)}%`
             }
           >
-            {data.map((entry, index) => (
-              <Cell key={entry.category} fill={COLORS[index % COLORS.length]} />
-            ))}
+            {data.map((entry, index) => {
+              const categoryColor = categories.find(
+                (c) => c.name === entry.category && c.type === "dépense",
+              )?.color;
+              return (
+                <Cell key={entry.category} fill={categoryColor || COLORS[index % COLORS.length]} />
+              );
+            })}
           </Pie>
           <Tooltip formatter={(value: number) => `${value.toLocaleString("fr-FR")} ${currency}`} />
           <Legend />
