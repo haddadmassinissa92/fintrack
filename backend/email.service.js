@@ -54,6 +54,54 @@ exports.sendPasswordResetEmail = async (to, resetUrl) => {
   }
 };
 
+// Rappel d'une dépense récurrente (facture, abonnement, loyer...) qui
+// arrive bientôt à échéance — voir billReminder.service.js pour la logique
+// qui décide quand l'envoyer (une seule fois par échéance).
+exports.sendBillReminderEmail = async (
+  to,
+  { label, amount, dueDateLabel, relativeLabel, currency },
+) => {
+  try {
+    const formattedAmount = amount.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+
+    const response = await fetch(BREVO_URL, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "api-key": process.env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: "FinTrack", email: process.env.EMAIL_USER },
+        to: [{ email: to }],
+        subject: `FinTrack — "${label}" arrive ${relativeLabel}`,
+        htmlContent: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #059669;">FinTrack</h2>
+            <p style="color: #d97706; font-weight: 600;">Rappel : "${label}" arrive ${relativeLabel}</p>
+            <p>
+              Un prélèvement de <strong>${formattedAmount} ${currency}</strong> est prévu le
+              <strong>${dueDateLabel}</strong>.
+            </p>
+            <p style="color: #6b7280; font-size: 14px;">
+              Pense à vérifier que ton solde est suffisant. Tu peux mettre cette
+              récurrence en pause à tout moment depuis ton tableau de bord FinTrack.
+            </p>
+          </div>
+        `,
+      }),
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(`Brevo a répondu ${response.status} : ${details}`);
+    }
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de l'envoi du rappel de facture");
+    throw error;
+  }
+};
+
 // Récapitulatif envoyé automatiquement au début de chaque mois, pour le
 // mois qui vient de se terminer — voir monthlyRecap.service.js pour la
 // logique qui décide quand l'envoyer (une seule fois par mois).

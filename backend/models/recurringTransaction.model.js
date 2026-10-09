@@ -52,6 +52,14 @@ const recurringTransactionSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Échéance (valeur de nextDueDate) pour laquelle un rappel a déjà été
+    // envoyé — voir billReminder.service.js. Quand nextDueDate avance à la
+    // prochaine occurrence, elle ne correspond plus et un nouveau rappel
+    // peut partir, sans jamais en envoyer deux pour la même échéance.
+    lastReminderFor: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

@@ -19,6 +19,7 @@ import TransactionList from "@/components/TransactionList";
 import TransactionForm from "@/components/TransactionForm";
 import TransactionFilters from "@/components/TransactionFilters";
 import UndoToasts from "@/components/UndoToasts";
+import UpcomingBills from "@/components/UpcomingBills";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -179,6 +180,8 @@ export default function DashboardPage() {
             currency={currency}
           />
         )}
+
+        <UpcomingBills currency={currency} categories={categories.all} />
 
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

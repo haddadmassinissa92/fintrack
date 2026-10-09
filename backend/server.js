@@ -6,6 +6,7 @@ const { startRecurringTransactionDispatcher } = require("./recurringTransaction.
 const { startBudgetAlertDispatcher } = require("./budgetAlert.service");
 const { startMonthlyRecapDispatcher } = require("./monthlyRecap.service");
 const { backfillCategoryStyles } = require("./categoryStyleBackfill");
+const { startBillReminderDispatcher } = require("./billReminder.service");
 
 const PORT = process.env.PORT || 5002;
 
@@ -15,4 +16,5 @@ app.listen(PORT, () => {
   startRecurringTransactionDispatcher();
   startBudgetAlertDispatcher();
   startMonthlyRecapDispatcher();
+  startBillReminderDispatcher();
 });
