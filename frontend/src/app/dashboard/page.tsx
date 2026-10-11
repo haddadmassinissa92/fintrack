@@ -37,8 +37,24 @@ export default function DashboardPage() {
     exportTransactions,
   } = useTransactionStore();
   const [showForm, setShowForm] = useState(false);
+  const [formInitialType, setFormInitialType] = useState<"dépense" | "revenu">("dépense");
   const [showImport, setShowImport] = useState(false);
   const [filters, setFilters] = useState({ search: "", type: "", category: "" });
+
+  // Raccourcis PWA (voir app/manifest.ts) : /dashboard?add=expense ou
+  // ?add=income ouvre directement le formulaire d'ajout. On lit
+  // window.location plutôt que useSearchParams, qui imposerait d'entourer
+  // la page d'un <Suspense> pour que le build Next.js passe. Le paramètre
+  // est retiré de l'URL aussitôt, pour qu'un rechargement ne rouvre pas
+  // le formulaire.
+  useEffect(() => {
+    const add = new URLSearchParams(window.location.search).get("add");
+    if (add === "expense" || add === "income") {
+      setFormInitialType(add === "income" ? "revenu" : "dépense");
+      setShowForm(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   // Mois actuellement consulté — par défaut le mois en cours. Naviguer
   // vers un mois passé ne supprime ni ne réinitialise rien : ça change
@@ -132,7 +148,10 @@ export default function DashboardPage() {
             </p>
           </div>
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setFormInitialType("dépense");
+              setShowForm(true);
+            }}
             className="flex items-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white rounded-full px-4 py-2 text-sm font-medium transition"
           >
             <Plus size={16} strokeWidth={2.5} />
@@ -252,7 +271,9 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {showForm && <TransactionForm onClose={() => setShowForm(false)} />}
+      {showForm && (
+        <TransactionForm initialType={formInitialType} onClose={() => setShowForm(false)} />
+      )}
       {showImport && (
         <ImportTransactions categories={categories} onClose={() => setShowImport(false)} />
       )}

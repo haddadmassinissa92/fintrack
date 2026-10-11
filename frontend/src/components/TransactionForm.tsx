@@ -35,11 +35,18 @@ function compressImage(file: File, maxWidth = 1000, quality = 0.7): Promise<stri
   });
 }
 
-export default function TransactionForm({ onClose }: { onClose: () => void }) {
+export default function TransactionForm({
+  onClose,
+  initialType = "dépense",
+}: {
+  onClose: () => void;
+  // Permet d'ouvrir le formulaire directement sur "revenu" (raccourci PWA)
+  initialType?: "dépense" | "revenu";
+}) {
   const { categories, getCategories, addTransaction } = useTransactionStore();
   const [showCategoryManager, setShowCategoryManager] = useState(false);
 
-  const [type, setType] = useState<"dépense" | "revenu">("dépense");
+  const [type, setType] = useState<"dépense" | "revenu">(initialType);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");

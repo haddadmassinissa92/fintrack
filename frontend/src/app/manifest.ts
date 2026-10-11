@@ -11,6 +11,26 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#f4f4f5",
     theme_color: "#059669",
     orientation: "portrait",
+    // Menu qui s'ouvre en appui long sur l'icône de l'app (Android) ou
+    // en clic droit sur son icône dans la barre des tâches (Chrome/Edge
+    // sur ordinateur). Les URL sont gérées par le dashboard, qui ouvre
+    // directement le formulaire d'ajout du bon type.
+    shortcuts: [
+      {
+        name: "Ajouter une dépense",
+        short_name: "Dépense",
+        description: "Enregistrer une nouvelle dépense",
+        url: "/dashboard?add=expense",
+        icons: [{ src: "/icons/shortcut-expense.png", sizes: "192x192", type: "image/png" }],
+      },
+      {
+        name: "Ajouter un revenu",
+        short_name: "Revenu",
+        description: "Enregistrer un nouveau revenu",
+        url: "/dashboard?add=income",
+        icons: [{ src: "/icons/shortcut-income.png", sizes: "192x192", type: "image/png" }],
+      },
+    ],
     icons: [
       {
         src: "/icons/icon-192.png",
