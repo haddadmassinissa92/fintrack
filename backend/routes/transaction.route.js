@@ -9,6 +9,7 @@ const {
   getStats,
   exportTransactions,
   importTransactions,
+  getInsights,
 } = require("../controllers/transaction.controller");
 const protectRoute = require("../middlewares/protectRoute");
 
@@ -18,6 +19,7 @@ const router = express.Router();
 router.use(protectRoute);
 
 router.get("/stats", getStats);
+router.get("/insights", getInsights);
 router.get("/export", exportTransactions);
 router.get("/", getTransactions);
 router.post("/", createTransaction);

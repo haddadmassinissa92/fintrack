@@ -6,6 +6,7 @@ import { axiosInstance } from "@/lib/axios";
 export const useTransactionStore = create((set, get) => ({
   transactions: [],
   stats: null,
+  insights: null,
   categories: { expense: [], income: [], all: [] },
   isLoading: false,
   isLoadingMore: false,
@@ -148,8 +149,29 @@ export const useTransactionStore = create((set, get) => ({
       } else {
         set({ statsMonthYear: null });
       }
+      // Les insights portent sur le même mois que les stats : les
+      // recalculer ici fait qu'ils se mettent à jour partout où les stats
+      // le sont déjà (changement de mois, ajout, suppression, import...),
+      // sans toucher à chacun de ces chemins. Appel indépendant : son
+      // échec ne doit jamais empêcher l'affichage des stats.
+      get().getInsights({ month, year });
+
       const res = await axiosInstance.get(`/transactions/stats?${params.toString()}`);
       set({ stats: res.data });
+    } catch (error) {
+      console.error(error);
+    }
+  },
+
+  getInsights: async ({ month, year } = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (month && year) {
+        params.set("month", month);
+        params.set("year", year);
+      }
+      const res = await axiosInstance.get(`/transactions/insights?${params.toString()}`);
+      set({ insights: res.data });
     } catch (error) {
       console.error(error);
     }

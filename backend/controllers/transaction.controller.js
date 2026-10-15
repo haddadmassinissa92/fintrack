@@ -3,6 +3,7 @@
 const Transaction = require("../models/transaction.model");
 const Category = require("../models/category.model");
 const logger = require("../logger");
+const { buildInsights } = require("../insights.service");
 
 // Vérifie qu'une catégorie donnée existe bien parmi les catégories de cet
 // utilisateur, pour ce type précis (revenu/dépense) — les catégories
@@ -520,3 +521,86 @@ function exportAsPdf(res, transactions, currency, username) {
   doc.end();
 }
 
+// En dessous de ce nombre de jours écoulés dans le mois courant, on ne
+// compare pas : trois jours de dépenses à peine ne disent rien de fiable
+// ("+200 % en Alimentation" parce qu'un seul gros achat a eu lieu).
+const MIN_DAYS_FOR_COMPARISON = 5;
+
+// Observations automatiques sur le mois consulté (?month=&year=, mois
+// courant par défaut). La logique de calcul est dans insights.service.js ;
+// ce contrôleur se contente de préparer les totaux — surtout d'aligner les
+// périodes : on compare les N premiers jours du mois consulté aux N
+// premiers jours des 3 mois précédents (N = jour du mois en cours si on
+// regarde le mois courant, mois entier sinon), jamais un mois partiel à
+// des mois complets.
+exports.getInsights = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { month, year } = req.query;
+    const realNow = new Date();
+    const target =
+      month && year
+        ? new Date(Number(year), Number(month) - 1, 1)
+        : new Date(realNow.getFullYear(), realNow.getMonth(), 1);
+    const y = target.getFullYear();
+    const m = target.getMonth(); // 0-indexé
+
+    const isCurrentMonth = y === realNow.getFullYear() && m === realNow.getMonth();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const dayLimit = isCurrentMonth ? realNow.getDate() : daysInMonth;
+    const comparable = !isCurrentMonth || dayLimit >= MIN_DAYS_FOR_COMPARISON;
+
+    // Fenêtre [début, fin[ du mois situé `monthsBack` mois avant le mois
+    // consulté. Pour le mois EN COURS, on ne prend que les `dayLimit`
+    // premiers jours (comparaison à période égale), plafonnés à la fin de
+    // chaque mois (le 31 n'existe pas en novembre). Pour un mois TERMINÉ,
+    // on compare des mois entiers : plafonner à la longueur du mois
+    // consulté ferait perdre le 31 d'un mois précédent plus long.
+    const windowFor = (monthsBack) => {
+      const start = new Date(y, m - monthsBack, 1);
+      const fullEnd = new Date(y, m - monthsBack + 1, 1);
+      if (!isCurrentMonth) return { start, end: fullEnd };
+      const cappedEnd = new Date(y, m - monthsBack, 1 + dayLimit);
+      return { start, end: cappedEnd < fullEnd ? cappedEnd : fullEnd };
+    };
+
+    const sumByCategory = async (window, type) => {
+      const rows = await Transaction.aggregate([
+        { $match: { user: userId, type, date: { $gte: window.start, $lt: window.end } } },
+        { $group: { _id: "$category", total: { $sum: "$amount" } } },
+      ]);
+      return Object.fromEntries(rows.map((r) => [r._id, r.total]));
+    };
+
+    const current = windowFor(0);
+    const [currentExpenseByCategory, currentIncomeByCategory, ...previousExpenseByCategory] =
+      await Promise.all([
+        sumByCategory(current, "dépense"),
+        sumByCategory(current, "revenu"),
+        sumByCategory(windowFor(1), "dépense"),
+        sumByCategory(windowFor(2), "dépense"),
+        sumByCategory(windowFor(3), "dépense"),
+      ]);
+
+    const currentIncome = Object.values(currentIncomeByCategory).reduce((s, v) => s + v, 0);
+
+    const { insights, comparedMonths } = buildInsights({
+      currentExpenseByCategory,
+      currentIncome,
+      previousExpenseByCategory,
+      comparable,
+    });
+
+    res.status(200).json({
+      month: m + 1,
+      year: y,
+      partial: isCurrentMonth,
+      comparable,
+      comparedMonths,
+      insights,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors du calcul des insights");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
