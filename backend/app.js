@@ -25,6 +25,7 @@ const budgetRoutes = require("./routes/budget.route");
 const recurringTransactionRoutes = require("./routes/recurringTransaction.route");
 const budgetPlanRoutes = require("./routes/budgetPlan.route");
 const pushRoutes = require("./routes/push.route");
+const debtRoutes = require("./routes/debt.route");
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use("/api/budgets", budgetRoutes);
 app.use("/api/recurring", recurringTransactionRoutes);
 app.use("/api/budget-plan", budgetPlanRoutes);
 app.use("/api/push", pushRoutes);
+app.use("/api/debts", debtRoutes);
 
 app.get("/", (req, res) => {
   res.send("API FinTrack en ligne.");

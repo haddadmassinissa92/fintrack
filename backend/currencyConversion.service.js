@@ -1,7 +1,7 @@
 // currencyConversion.service.js
 //
 // Convertit TOUTES les sommes d'argent d'un utilisateur (transactions,
-// budgets, objectifs d'épargne, transactions récurrentes) d'une devise
+// budgets, objectifs d'épargne, transactions récurrentes, dettes) d'une devise
 // vers une autre, en une fois, quand il change sa devise dans les
 // paramètres. Ce n'est pas un système multi-devises permanent : après
 // cette conversion, tout le compte est de nouveau dans une seule devise
@@ -11,6 +11,7 @@ const Transaction = require("./models/transaction.model");
 const Budget = require("./models/budget.model");
 const SavingsGoal = require("./models/savingsGoal.model");
 const RecurringTransaction = require("./models/recurringTransaction.model");
+const Debt = require("./models/debt.model");
 const logger = require("./logger");
 
 // Taux de change via fxratesapi.com — gratuit, sans clé API, couvre le
@@ -83,6 +84,35 @@ async function convertUserAmounts(userId, rate) {
     RecurringTransaction.updateMany(
       { user: userId },
       [{ $set: { amount: round2 } }],
+      pipelineOption,
+    ),
+    // Une dette contient des montants à trois endroits : le total, le déjà
+    // remboursé, et chaque remboursement de l'historique. Total et
+    // remboursé sont arrondis à partir du MÊME calcul, donc une dette
+    // entièrement soldée reste exactement soldée après conversion (au lieu
+    // de laisser un reste fantôme d'un centime).
+    Debt.updateMany(
+      { user: userId },
+      [
+        {
+          $set: {
+            amount: { $round: [{ $multiply: ["$amount", rate] }, 2] },
+            paidAmount: { $round: [{ $multiply: ["$paidAmount", rate] }, 2] },
+            payments: {
+              $map: {
+                input: { $ifNull: ["$payments", []] },
+                as: "p",
+                in: {
+                  $mergeObjects: [
+                    "$$p",
+                    { amount: { $round: [{ $multiply: ["$$p.amount", rate] }, 2] } },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      ],
       pipelineOption,
     ),
   ]);

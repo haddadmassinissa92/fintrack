@@ -21,6 +21,7 @@ import TransactionFilters from "@/components/TransactionFilters";
 import UndoToasts from "@/components/UndoToasts";
 import UpcomingBills from "@/components/UpcomingBills";
 import InsightsCards from "@/components/InsightsCards";
+import Debts from "@/components/Debts";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -223,6 +224,7 @@ export default function DashboardPage() {
         </div>
 
         <RecurringTransactions currency={currency} />
+        <Debts currency={currency} />
 
         <BudgetPlanCard currency={currency} />
 

@@ -192,7 +192,7 @@ export default function SettingsPage() {
           <h2 className="font-semibold mb-1">Exporter mes données</h2>
           <p className="text-sm text-zinc-500 mb-4">
             Télécharge un fichier contenant toutes tes données FinTrack : transactions,
-            budgets, objectifs d&apos;épargne, transactions récurrentes et catégories. Les
+            budgets, objectifs d&apos;épargne, transactions récurrentes, dettes et catégories. Les
             photos de reçus ne sont pas incluses, pour garder un fichier léger.
           </p>
 

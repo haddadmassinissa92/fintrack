@@ -9,6 +9,7 @@ const Transaction = require("../models/transaction.model");
 const Budget = require("../models/budget.model");
 const SavingsGoal = require("../models/savingsGoal.model");
 const RecurringTransaction = require("../models/recurringTransaction.model");
+const Debt = require("../models/debt.model");
 const {
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
@@ -252,20 +253,21 @@ exports.resetPassword = async (req, res) => {
 
 // Export complet de toutes les données de l'utilisateur en un seul
 // fichier JSON téléchargeable — transactions, budgets, objectifs
-// d'épargne, transactions récurrentes et catégories. Les photos de
+// d'épargne, transactions récurrentes, catégories et dettes. Les photos de
 // reçus sont volontairement exclues : elles gonfleraient énormément le
 // fichier sans vraiment apporter de valeur de portabilité des données.
 exports.exportAccountData = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const [user, transactions, budgets, goals, recurring, categories] = await Promise.all([
+    const [user, transactions, budgets, goals, recurring, categories, debts] = await Promise.all([
       User.findById(userId).select("-password"),
       Transaction.find({ user: userId }).select("-receiptImage").sort({ date: -1 }),
       Budget.find({ user: userId }),
       SavingsGoal.find({ user: userId }),
       RecurringTransaction.find({ user: userId }),
       Category.find({ user: userId }),
+      Debt.find({ user: userId }),
     ]);
 
     const payload = {
@@ -281,6 +283,7 @@ exports.exportAccountData = async (req, res) => {
       savingsGoals: goals,
       recurringTransactions: recurring,
       categories,
+      debts,
     };
 
     const filename = `fintrack-export-${new Date().toISOString().slice(0, 10)}.json`;
