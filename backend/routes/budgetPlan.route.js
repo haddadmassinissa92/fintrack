@@ -2,10 +2,10 @@
 
 const express = require("express");
 const { getBudgetPlan } = require("../controllers/budgetPlan.controller");
-const protectRoute = require("../middlewares/protectRoute");
+const protectDataRoute = require("../middlewares/protectDataRoute");
 
 const router = express.Router();
 
-router.get("/", protectRoute, getBudgetPlan);
+router.get("/", protectDataRoute, getBudgetPlan);
 
 module.exports = router;

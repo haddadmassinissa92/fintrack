@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Wallet, LogOut, Moon, Sun, Bell, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
+import AccountSwitcher from "./AccountSwitcher";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { getInitialTheme, toggleTheme } from "@/lib/theme";
 
@@ -58,6 +59,8 @@ export default function Navbar() {
 
       <div className="flex items-center gap-3">
         <span className="text-sm text-zinc-500 hidden sm:inline">{authUser?.username}</span>
+
+        <AccountSwitcher />
 
         <div className="relative">
           <button

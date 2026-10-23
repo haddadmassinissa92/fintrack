@@ -7,11 +7,11 @@ const {
   updateCategory,
   deleteCategory,
 } = require("../controllers/category.controller");
-const protectRoute = require("../middlewares/protectRoute");
+const protectDataRoute = require("../middlewares/protectDataRoute");
 
 const router = express.Router();
 
-router.use(protectRoute);
+router.use(protectDataRoute);
 
 router.get("/", getCategories);
 router.post("/", createCategory);

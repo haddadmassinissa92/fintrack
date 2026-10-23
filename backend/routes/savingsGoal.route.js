@@ -8,11 +8,11 @@ const {
   addContribution,
   deleteGoal,
 } = require("../controllers/savingsGoal.controller");
-const protectRoute = require("../middlewares/protectRoute");
+const protectDataRoute = require("../middlewares/protectDataRoute");
 
 const router = express.Router();
 
-router.use(protectRoute);
+router.use(protectDataRoute);
 
 router.get("/", getGoals);
 router.post("/", createGoal);

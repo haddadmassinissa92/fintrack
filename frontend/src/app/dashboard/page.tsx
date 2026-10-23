@@ -22,10 +22,16 @@ import UndoToasts from "@/components/UndoToasts";
 import UpcomingBills from "@/components/UpcomingBills";
 import InsightsCards from "@/components/InsightsCards";
 import Debts from "@/components/Debts";
+import SharedAccountBanner, { type ActiveAccount } from "@/components/SharedAccountBanner";
+import { useAccountStore } from "@/store/useAccountStore";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { authUser, isCheckingAuth, checkAuth } = useAuthStore();
+  const { activeOwnerId, activeError, getActive, switchTo } = useAccountStore();
+  // Le store est un fichier .js non typé : sans cette précision, TypeScript
+  // infère `null` et refuse tout accès aux champs de `active`
+  const active = useAccountStore((state) => state.active) as ActiveAccount | null;
   const {
     transactions,
     stats,
@@ -101,6 +107,12 @@ export default function DashboardPage() {
     checkAuth();
   }, [checkAuth]);
 
+  // Compte partagé consulté : on a besoin de sa devise avant d'afficher le
+  // moindre montant. Pour son propre compte, rien à charger.
+  useEffect(() => {
+    if (activeOwnerId) getActive();
+  }, [activeOwnerId, getActive]);
+
   useEffect(() => {
     if (!isCheckingAuth && !authUser) {
       router.replace("/login");
@@ -125,7 +137,7 @@ export default function DashboardPage() {
     return () => clearTimeout(timeout);
   }, [authUser, filters, viewedMonth, viewedYear, getTransactions]);
 
-  if (isCheckingAuth || !authUser) {
+  if (isCheckingAuth || !authUser || (activeOwnerId && !active && !activeError)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-zinc-400 text-sm">Chargement...</p>
@@ -133,13 +145,48 @@ export default function DashboardPage() {
     );
   }
 
-  const currency = authUser.currency || "DZD";
+  // Compte partagé dont les infos n'ont pas pu être chargées (réseau, serveur) :
+  // sans la devise de son propriétaire, afficher ses montants avec la nôtre
+  // serait FAUX. On préfère un écran d'erreur à des chiffres mal étiquetés.
+  // (Arriver ici avec activeOwnerId et sans `active` implique que le
+  // chargement a échoué : le garde ci-dessus attend tant qu'il est en cours.)
+  if (activeOwnerId && !active) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-sm text-zinc-500">
+          Impossible de charger ce compte partagé pour le moment.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => getActive()}
+            className="border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2 text-sm"
+          >
+            Réessayer
+          </button>
+          <button
+            onClick={() => switchTo(null)}
+            className="bg-accent-600 hover:bg-accent-700 text-white rounded-lg px-4 py-2 text-sm font-medium"
+          >
+            Revenir à mon compte
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Un compte partagé s'affiche dans la devise de son PROPRIÉTAIRE : ses
+  // montants sont enregistrés dans cette devise, pas dans celle du visiteur.
+  // Pour son propre compte, authUser reste la source (il est mis à jour tout de
+  // suite après un changement de devise, contrairement à `active`).
+  const currency = (active?.isShared ? active.currency : authUser.currency) || "DZD";
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <Navbar />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <SharedAccountBanner active={active} onLeave={() => switchTo(null)} />
+
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold">Bonjour {authUser.username} 👋</h1>

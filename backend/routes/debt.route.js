@@ -8,11 +8,11 @@ const {
   deletePayment,
   deleteDebt,
 } = require("../controllers/debt.controller");
-const protectRoute = require("../middlewares/protectRoute");
+const protectDataRoute = require("../middlewares/protectDataRoute");
 
 const router = express.Router();
 
-router.use(protectRoute);
+router.use(protectDataRoute);
 
 router.get("/", getDebts);
 router.post("/", createDebt);

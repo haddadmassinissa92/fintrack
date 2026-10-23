@@ -11,12 +11,12 @@ const {
   importTransactions,
   getInsights,
 } = require("../controllers/transaction.controller");
-const protectRoute = require("../middlewares/protectRoute");
+const protectDataRoute = require("../middlewares/protectDataRoute");
 
 const router = express.Router();
 
 // Toutes les routes de ce fichier nécessitent d'être connecté
-router.use(protectRoute);
+router.use(protectDataRoute);
 
 router.get("/stats", getStats);
 router.get("/insights", getInsights);

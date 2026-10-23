@@ -6,6 +6,7 @@ import { Settings as SettingsIcon, Check, ArrowLeft, Download } from "lucide-rea
 import { useAuthStore } from "@/store/useAuthStore";
 import Navbar from "@/components/Navbar";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
+import ShareManager from "@/components/ShareManager";
 
 // Liste volontairement courte de devises courantes — l'utilisateur peut
 // toujours en saisir une autre via le champ libre juste en dessous.
@@ -211,6 +212,8 @@ export default function SettingsPage() {
             {isExporting ? "Préparation..." : "Télécharger toutes mes données (JSON)"}
           </button>
         </div>
+
+        <ShareManager />
 
         <PushNotificationToggle />
       </main>

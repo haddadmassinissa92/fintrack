@@ -2,11 +2,11 @@
 
 const express = require("express");
 const { getBudgets, setBudget, deleteBudget } = require("../controllers/budget.controller");
-const protectRoute = require("../middlewares/protectRoute");
+const protectDataRoute = require("../middlewares/protectDataRoute");
 
 const router = express.Router();
 
-router.use(protectRoute);
+router.use(protectDataRoute);
 
 router.get("/", getBudgets);
 router.post("/", setBudget);
