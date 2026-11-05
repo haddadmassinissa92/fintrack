@@ -1,7 +1,6 @@
 // models/transaction.model.js
 
 const mongoose = require("mongoose");
-const { EXPENSE_CATEGORIES, INCOME_CATEGORIES } = require("../constants/categories");
 
 const transactionSchema = new mongoose.Schema(
   {
@@ -27,10 +26,13 @@ const transactionSchema = new mongoose.Schema(
       min: 0.01,
     },
 
+    // Nom de la catégorie : validé dynamiquement par rapport aux catégories
+    // de l'utilisateur (Category model), ce qui permet de créer librement
+    // des catégories personnalisées sans blocage de schéma enum.
     category: {
       type: String,
       required: true,
-      enum: [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES],
+      trim: true,
     },
 
     description: {

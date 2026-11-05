@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Repeat, Plus, Trash2, Pause, Play } from "lucide-react";
+import { Repeat, Plus, Trash2, Pause, Play, Pencil } from "lucide-react";
 import { useRecurringStore } from "@/store/useRecurringStore";
 import { useTransactionStore } from "@/store/useTransactionStore";
 
@@ -27,9 +27,10 @@ function formatAmount(amount: number, currency: string) {
 }
 
 export default function RecurringTransactions({ currency }: { currency: string }) {
-  const { recurring, getRecurring, createRecurring, toggleActive, deleteRecurring } = useRecurringStore();
+  const { recurring, getRecurring, createRecurring, updateRecurring, toggleActive, deleteRecurring } = useRecurringStore();
   const { categories, getCategories } = useTransactionStore();
   const [showForm, setShowForm] = useState(false);
+  const [editingRecurring, setEditingRecurring] = useState<Recurring | null>(null);
   const [type, setType] = useState<"dépense" | "revenu">("dépense");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -45,6 +46,30 @@ export default function RecurringTransactions({ currency }: { currency: string }
 
   const availableCategories = type === "dépense" ? categories.expense : categories.income;
 
+  const handleOpenAdd = () => {
+    setEditingRecurring(null);
+    setType("dépense");
+    setAmount("");
+    setCategory("");
+    setDescription("");
+    setFrequency("monthly");
+    setStartDate(new Date().toISOString().slice(0, 10));
+    setError("");
+    setShowForm(true);
+  };
+
+  const handleOpenEdit = (r: Recurring) => {
+    setEditingRecurring(r);
+    setType(r.type);
+    setAmount(String(r.amount));
+    setCategory(r.category);
+    setDescription(r.description || "");
+    setFrequency(r.frequency);
+    setStartDate(new Date(r.nextDueDate).toISOString().slice(0, 10));
+    setError("");
+    setShowForm(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -52,18 +77,33 @@ export default function RecurringTransactions({ currency }: { currency: string }
       setError("Un montant et une catégorie valides sont requis.");
       return;
     }
-    const result = await createRecurring({
-      type,
-      amount: Number(amount),
-      category,
-      description,
-      frequency,
-      startDate,
-    });
+
+    let result;
+    if (editingRecurring) {
+      result = await updateRecurring(editingRecurring._id, {
+        type,
+        amount: Number(amount),
+        category,
+        description,
+        frequency,
+        nextDueDate: startDate,
+      });
+    } else {
+      result = await createRecurring({
+        type,
+        amount: Number(amount),
+        category,
+        description,
+        frequency,
+        startDate,
+      });
+    }
+
     if (result.success) {
       setAmount("");
       setCategory("");
       setDescription("");
+      setEditingRecurring(null);
       setShowForm(false);
     } else {
       setError(result.message);
@@ -78,7 +118,7 @@ export default function RecurringTransactions({ currency }: { currency: string }
           Transactions récurrentes
         </h3>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={handleOpenAdd}
           className="flex items-center gap-1 text-xs text-accent-600 border border-accent-600 rounded-full px-2.5 py-1 hover:bg-accent-50 dark:hover:bg-accent-950 transition"
         >
           <Plus size={13} strokeWidth={2.5} />
@@ -114,14 +154,21 @@ export default function RecurringTransactions({ currency }: { currency: string }
               <button
                 onClick={() => toggleActive(r._id)}
                 aria-label={r.active ? "Mettre en pause" : "Réactiver"}
-                className="text-zinc-400 hover:text-accent-600 transition shrink-0"
+                className="text-zinc-400 hover:text-accent-600 transition shrink-0 p-1 rounded"
               >
                 {r.active ? <Pause size={15} strokeWidth={2} /> : <Play size={15} strokeWidth={2} />}
               </button>
               <button
+                onClick={() => handleOpenEdit(r)}
+                aria-label="Modifier"
+                className="text-zinc-400 hover:text-accent-600 transition shrink-0 p-1 rounded"
+              >
+                <Pencil size={15} strokeWidth={2} />
+              </button>
+              <button
                 onClick={() => deleteRecurring(r._id)}
                 aria-label="Supprimer"
-                className="text-zinc-300 hover:text-red-600 transition shrink-0"
+                className="text-zinc-400 hover:text-red-600 transition shrink-0 p-1 rounded"
               >
                 <Trash2 size={15} strokeWidth={2} />
               </button>
@@ -133,14 +180,19 @@ export default function RecurringTransactions({ currency }: { currency: string }
       {showForm && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowForm(false)}
+          onClick={() => {
+            setShowForm(false);
+            setEditingRecurring(null);
+          }}
         >
           <form
             onSubmit={handleSubmit}
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm"
           >
-            <h3 className="font-bold mb-4">Nouvelle transaction récurrente</h3>
+            <h3 className="font-bold mb-4">
+              {editingRecurring ? "Modifier la récurrence" : "Nouvelle transaction récurrente"}
+            </h3>
 
             {error && (
               <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/40 rounded-lg px-3 py-2 mb-4">
@@ -225,7 +277,7 @@ export default function RecurringTransactions({ currency }: { currency: string }
             </select>
 
             <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">
-              Première échéance
+              Échéance
             </label>
             <input
               type="date"
@@ -237,7 +289,10 @@ export default function RecurringTransactions({ currency }: { currency: string }
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingRecurring(null);
+                }}
                 className="flex-1 border border-zinc-300 dark:border-zinc-700 rounded-lg py-2 text-sm"
               >
                 Annuler
@@ -246,7 +301,7 @@ export default function RecurringTransactions({ currency }: { currency: string }
                 type="submit"
                 className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-lg py-2 text-sm font-medium"
               >
-                Créer
+                {editingRecurring ? "Enregistrer" : "Créer"}
               </button>
             </div>
           </form>

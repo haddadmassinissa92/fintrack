@@ -46,6 +46,15 @@ export const useAuthStore = create((set, get) => ({
     set({ authUser: null });
   },
 
+  updatePassword: async (currentPassword, newPassword) => {
+    try {
+      const res = await axiosInstance.put("/auth/password", { currentPassword, newPassword });
+      return { success: true, message: res.data.message };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
   forgotPassword: async (email) => {
     try {
       const res = await axiosInstance.post("/auth/forgot-password", { email });

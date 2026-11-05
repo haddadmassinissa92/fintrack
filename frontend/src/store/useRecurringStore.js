@@ -29,6 +29,16 @@ export const useRecurringStore = create((set, get) => ({
     }
   },
 
+  updateRecurring: async (id, data) => {
+    try {
+      const res = await axiosInstance.put(`/recurring/${id}`, data);
+      set({ recurring: get().recurring.map((r) => (r._id === id ? res.data : r)) });
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
   toggleActive: async (id) => {
     try {
       const res = await axiosInstance.put(`/recurring/${id}/toggle`);

@@ -53,6 +53,56 @@ exports.createRecurringTransaction = async (req, res) => {
   }
 };
 
+// Modifie une transaction récurrente existante (montant, catégorie, description, fréquence, date)
+exports.updateRecurringTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const recurring = await RecurringTransaction.findById(id);
+
+    if (!recurring) {
+      return res.status(404).json({ message: "Transaction récurrente introuvable." });
+    }
+    if (recurring.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Action non autorisée." });
+    }
+
+    const { type, amount, category, description, frequency, nextDueDate, active } = req.body;
+
+    if (type) recurring.type = type;
+    if (amount !== undefined) {
+      if (amount <= 0) {
+        return res.status(400).json({ message: "Le montant doit être positif." });
+      }
+      recurring.amount = amount;
+    }
+    if (category) {
+      if (!(await isValidCategory(req.user._id, recurring.type, category))) {
+        return res.status(400).json({ message: "Catégorie invalide pour ce type de transaction." });
+      }
+      recurring.category = category;
+    }
+    if (description !== undefined) recurring.description = description.trim();
+    if (frequency) {
+      if (!["weekly", "monthly", "yearly"].includes(frequency)) {
+        return res.status(400).json({ message: "Fréquence invalide." });
+      }
+      recurring.frequency = frequency;
+    }
+    if (nextDueDate) {
+      recurring.nextDueDate = new Date(nextDueDate);
+    }
+    if (active !== undefined) {
+      recurring.active = Boolean(active);
+    }
+
+    await recurring.save();
+    res.status(200).json(recurring);
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de la modification d'une transaction récurrente");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
 // Met en pause ou réactive une récurrence, sans la supprimer
 exports.toggleActive = async (req, res) => {
   try {

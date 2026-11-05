@@ -4,6 +4,7 @@ const express = require("express");
 const {
   getRecurringTransactions,
   createRecurringTransaction,
+  updateRecurringTransaction,
   toggleActive,
   deleteRecurringTransaction,
 } = require("../controllers/recurringTransaction.controller");
@@ -15,6 +16,7 @@ router.use(protectDataRoute);
 
 router.get("/", getRecurringTransactions);
 router.post("/", createRecurringTransaction);
+router.put("/:id", updateRecurringTransaction);
 router.put("/:id/toggle", toggleActive);
 router.delete("/:id", deleteRecurringTransaction);
 

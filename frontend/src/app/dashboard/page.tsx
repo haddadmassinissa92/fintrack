@@ -16,7 +16,7 @@ import BudgetTracker from "@/components/BudgetTracker";
 import RecurringTransactions from "@/components/RecurringTransactions";
 import BudgetPlanCard from "@/components/BudgetPlanCard";
 import TransactionList from "@/components/TransactionList";
-import TransactionForm from "@/components/TransactionForm";
+import TransactionForm, { type TransactionData } from "@/components/TransactionForm";
 import TransactionFilters from "@/components/TransactionFilters";
 import UndoToasts from "@/components/UndoToasts";
 import UpcomingBills from "@/components/UpcomingBills";
@@ -45,6 +45,7 @@ export default function DashboardPage() {
     exportTransactions,
   } = useTransactionStore();
   const [showForm, setShowForm] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<TransactionData | null>(null);
   const [formInitialType, setFormInitialType] = useState<"dépense" | "revenu">("dépense");
   const [showImport, setShowImport] = useState(false);
   const [filters, setFilters] = useState({ search: "", type: "", category: "" });
@@ -307,6 +308,7 @@ export default function DashboardPage() {
             transactions={transactions}
             currency={currency}
             categories={categories.all}
+            onEdit={(t) => setEditingTransaction(t as unknown as TransactionData)}
           />
           {hasMore && (
             <div className="flex justify-center mt-4">
@@ -324,6 +326,12 @@ export default function DashboardPage() {
 
       {showForm && (
         <TransactionForm initialType={formInitialType} onClose={() => setShowForm(false)} />
+      )}
+      {editingTransaction && (
+        <TransactionForm
+          transactionToEdit={editingTransaction}
+          onClose={() => setEditingTransaction(null)}
+        />
       )}
       {showImport && (
         <ImportTransactions categories={categories} onClose={() => setShowImport(false)} />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wallet2, Plus, Trash2 } from "lucide-react";
+import { Wallet2, Plus, Trash2, Pencil } from "lucide-react";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { useTransactionStore } from "@/store/useTransactionStore";
 
@@ -28,6 +28,7 @@ export default function BudgetTracker({
   const { budgets, getBudgets, setBudget, deleteBudget } = useBudgetStore();
   const { categories, getCategories } = useTransactionStore();
   const [showForm, setShowForm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [category, setCategory] = useState("");
   const [monthlyLimit, setMonthlyLimit] = useState("");
   const [error, setError] = useState("");
@@ -38,17 +39,32 @@ export default function BudgetTracker({
   }, [getBudgets, getCategories, month, year]);
 
   // Catégories de dépense pas encore budgétées, pour éviter de proposer
-  // dans le menu déroulant une catégorie déjà suivie (il suffit de
-  // redéfinir la limite existante pour la changer, pas d'en recréer une)
+  // dans le menu déroulant une catégorie déjà suivie
   const budgetedCategories = budgets.map((b: Budget) => b.category);
-  const availableCategories = (categories.expense || []).filter(
-    (c: string) => !budgetedCategories.includes(c),
-  );
+  const availableCategories = isEditing
+    ? categories.expense || []
+    : (categories.expense || []).filter((c: string) => !budgetedCategories.includes(c));
 
   const overCount = budgets.filter((b: Budget) => b.spent > b.monthlyLimit).length;
   const warningCount = budgets.filter(
     (b: Budget) => b.spent <= b.monthlyLimit && b.spent / b.monthlyLimit >= 0.8,
   ).length;
+
+  const handleOpenAdd = () => {
+    setIsEditing(false);
+    setCategory("");
+    setMonthlyLimit("");
+    setError("");
+    setShowForm(true);
+  };
+
+  const handleOpenEdit = (b: Budget) => {
+    setIsEditing(true);
+    setCategory(b.category);
+    setMonthlyLimit(String(b.monthlyLimit));
+    setError("");
+    setShowForm(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +91,7 @@ export default function BudgetTracker({
           Budgets mensuels
         </h3>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={handleOpenAdd}
           className="flex items-center gap-1 text-xs text-accent-600 border border-accent-600 rounded-full px-2.5 py-1 hover:bg-accent-50 dark:hover:bg-accent-950 transition"
         >
           <Plus size={13} strokeWidth={2.5} />
@@ -102,9 +118,6 @@ export default function BudgetTracker({
           {budgets.map((b: Budget) => {
             const percent = Math.min(100, Math.round((b.spent / b.monthlyLimit) * 100));
             const isOver = b.spent > b.monthlyLimit;
-            // Palier intermédiaire : à partir de 80% mais avant le
-            // dépassement, on prévient sans encore traiter ça comme une
-            // erreur — le rouge est réservé au dépassement réel.
             const isWarning = !isOver && b.spent / b.monthlyLimit >= 0.8;
             const barColor = isOver
               ? "bg-expense-600"
@@ -120,13 +133,22 @@ export default function BudgetTracker({
               <div key={b._id}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium">{b.category}</span>
-                  <button
-                    onClick={() => deleteBudget(b._id)}
-                    aria-label="Supprimer le budget"
-                    className="text-zinc-300 hover:text-red-600 transition"
-                  >
-                    <Trash2 size={14} strokeWidth={2} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleOpenEdit(b)}
+                      aria-label="Modifier la limite"
+                      className="text-zinc-400 hover:text-accent-600 transition"
+                    >
+                      <Pencil size={13} strokeWidth={2} />
+                    </button>
+                    <button
+                      onClick={() => deleteBudget(b._id)}
+                      aria-label="Supprimer le budget"
+                      className="text-zinc-400 hover:text-red-600 transition"
+                    >
+                      <Trash2 size={13} strokeWidth={2} />
+                    </button>
+                  </div>
                 </div>
                 <div className="w-full h-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-1">
                   <div
@@ -155,7 +177,9 @@ export default function BudgetTracker({
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm"
           >
-            <h3 className="font-bold mb-4">Définir un budget mensuel</h3>
+            <h3 className="font-bold mb-4">
+              {isEditing ? `Modifier le budget : ${category}` : "Définir un budget mensuel"}
+            </h3>
 
             {error && (
               <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/40 rounded-lg px-3 py-2 mb-4">
@@ -163,22 +187,30 @@ export default function BudgetTracker({
               </p>
             )}
 
-            <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">Catégorie</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-4 bg-white dark:bg-zinc-900 text-sm"
-            >
-              <option value="">Choisir...</option>
-              {availableCategories.map((c: string) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            {!isEditing ? (
+              <>
+                <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">Catégorie</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-4 bg-white dark:bg-zinc-900 text-sm"
+                >
+                  <option value="">Choisir...</option>
+                  {availableCategories.map((c: string) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <p className="text-sm font-medium mb-3 text-zinc-500">
+                Catégorie : <span className="text-zinc-900 dark:text-zinc-100 font-semibold">{category}</span>
+              </p>
+            )}
 
             <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">
-              Limite mensuelle
+              Limite mensuelle ({currency})
             </label>
             <input
               type="number"
@@ -201,7 +233,7 @@ export default function BudgetTracker({
                 type="submit"
                 className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-lg py-2 text-sm font-medium"
               >
-                Définir
+                {isEditing ? "Enregistrer" : "Définir"}
               </button>
             </div>
           </form>

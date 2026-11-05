@@ -29,6 +29,16 @@ export const useGoalStore = create((set, get) => ({
     }
   },
 
+  updateGoal: async (id, data) => {
+    try {
+      const res = await axiosInstance.put(`/goals/${id}`, data);
+      set({ goals: get().goals.map((g) => (g._id === id ? res.data : g)) });
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
   contribute: async (id, amount) => {
     try {
       const res = await axiosInstance.put(`/goals/${id}/contribute`, { amount });

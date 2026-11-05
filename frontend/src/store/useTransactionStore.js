@@ -206,6 +206,19 @@ export const useTransactionStore = create((set, get) => ({
     }
   },
 
+  updateTransaction: async (id, data) => {
+    try {
+      const res = await axiosInstance.put(`/transactions/${id}`, data);
+      set({
+        transactions: get().transactions.map((t) => (t._id === id ? res.data : t)),
+      });
+      get().getStats(get().statsMonthYear || {});
+      return { success: true, transaction: res.data };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
   // Supprime "visuellement" tout de suite (retrait de la liste), mais
   // n'envoie la requête de suppression réelle qu'après un délai — le
   // temps de laisser l'utilisateur annuler via le toast affiché.

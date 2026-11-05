@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Target, Plus, Trash2, X } from "lucide-react";
+import { Target, Plus, Trash2, Pencil, X } from "lucide-react";
 import { useGoalStore } from "@/store/useGoalStore";
 
 type Goal = {
@@ -19,16 +19,12 @@ function formatAmount(amount: number, currency: string) {
 
 // Projection simple : extrapole le rythme moyen depuis la création de
 // l'objectif (montant actuel ÷ temps écoulé) pour estimer quand le
-// montant visé sera atteint. Pas d'historique détaillé des
-// contributions à disposition, donc c'est une moyenne globale, pas une
-// tendance récente — suffisant pour une estimation indicative.
+// montant visé sera atteint.
 function getProjection(goal: Goal): { date: Date; behindSchedule: boolean } | null {
   const now = new Date();
   const createdAt = new Date(goal.createdAt);
   const daysElapsed = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
 
-  // Pas assez de recul pour extrapoler un rythme fiable, ou rien n'a
-  // encore été mis de côté
   if (daysElapsed < 3 || goal.currentAmount <= 0) return null;
   if (goal.currentAmount >= goal.targetAmount) return null;
 
@@ -45,8 +41,9 @@ function getProjection(goal: Goal): { date: Date; behindSchedule: boolean } | nu
 }
 
 export default function SavingsGoals({ currency }: { currency: string }) {
-  const { goals, getGoals, createGoal, contribute, deleteGoal } = useGoalStore();
+  const { goals, getGoals, createGoal, updateGoal, contribute, deleteGoal } = useGoalStore();
   const [showForm, setShowForm] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [targetDate, setTargetDate] = useState("");
@@ -58,22 +55,52 @@ export default function SavingsGoals({ currency }: { currency: string }) {
     getGoals();
   }, [getGoals]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleOpenAdd = () => {
+    setEditingGoal(null);
+    setName("");
+    setTargetAmount("");
+    setTargetDate("");
+    setError("");
+    setShowForm(true);
+  };
+
+  const handleOpenEdit = (goal: Goal) => {
+    setEditingGoal(goal);
+    setName(goal.name);
+    setTargetAmount(String(goal.targetAmount));
+    setTargetDate(goal.targetDate ? new Date(goal.targetDate).toISOString().slice(0, 10) : "");
+    setError("");
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!name.trim() || !targetAmount || Number(targetAmount) <= 0) {
       setError("Un nom et un montant visé valide sont requis.");
       return;
     }
-    const result = await createGoal({
-      name: name.trim(),
-      targetAmount: Number(targetAmount),
-      targetDate: targetDate || null,
-    });
+
+    let result;
+    if (editingGoal) {
+      result = await updateGoal(editingGoal._id, {
+        name: name.trim(),
+        targetAmount: Number(targetAmount),
+        targetDate: targetDate || null,
+      });
+    } else {
+      result = await createGoal({
+        name: name.trim(),
+        targetAmount: Number(targetAmount),
+        targetDate: targetDate || null,
+      });
+    }
+
     if (result.success) {
       setName("");
       setTargetAmount("");
       setTargetDate("");
+      setEditingGoal(null);
       setShowForm(false);
     } else {
       setError(result.message);
@@ -95,7 +122,7 @@ export default function SavingsGoals({ currency }: { currency: string }) {
           Objectifs d&apos;épargne
         </h3>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={handleOpenAdd}
           className="flex items-center gap-1 text-xs text-accent-600 border border-accent-600 rounded-full px-2.5 py-1 hover:bg-accent-50 dark:hover:bg-accent-950 transition"
         >
           <Plus size={13} strokeWidth={2.5} />
@@ -117,26 +144,36 @@ export default function SavingsGoals({ currency }: { currency: string }) {
               <div key={goal._id}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium">{goal.name}</span>
-                  <button
-                    onClick={() => deleteGoal(goal._id)}
-                    aria-label="Supprimer l'objectif"
-                    className="text-zinc-300 hover:text-red-600 transition"
-                  >
-                    <Trash2 size={14} strokeWidth={2} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleOpenEdit(goal)}
+                      aria-label="Modifier l'objectif"
+                      className="text-zinc-400 hover:text-accent-600 transition"
+                    >
+                      <Pencil size={13} strokeWidth={2} />
+                    </button>
+                    <button
+                      onClick={() => deleteGoal(goal._id)}
+                      aria-label="Supprimer l'objectif"
+                      className="text-zinc-400 hover:text-red-600 transition"
+                    >
+                      <Trash2 size={13} strokeWidth={2} />
+                    </button>
+                  </div>
                 </div>
+
                 <div className="w-full h-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-1">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      isReached ? "bg-accent-600" : "bg-accent-500"
+                      isReached ? "bg-accent-500" : "bg-accent-600"
                     }`}
                     style={{ width: `${percent}%` }}
                   />
                 </div>
+
                 <div className="flex items-center justify-between text-xs text-zinc-500">
                   <span>
-                    {formatAmount(goal.currentAmount, currency)} / {formatAmount(goal.targetAmount, currency)} (
-                    {percent}%)
+                    {formatAmount(goal.currentAmount, currency)} / {formatAmount(goal.targetAmount, currency)} ({percent}%)
                   </span>
                   {goal.targetDate && (
                     <span>Visé pour le {new Date(goal.targetDate).toLocaleDateString("fr-FR")}</span>
@@ -198,14 +235,19 @@ export default function SavingsGoals({ currency }: { currency: string }) {
       {showForm && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowForm(false)}
+          onClick={() => {
+            setShowForm(false);
+            setEditingGoal(null);
+          }}
         >
           <form
-            onSubmit={handleCreate}
+            onSubmit={handleSubmit}
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm"
           >
-            <h3 className="font-bold mb-4">Nouvel objectif d&apos;épargne</h3>
+            <h3 className="font-bold mb-4">
+              {editingGoal ? "Modifier l'objectif" : "Nouvel objectif d'épargne"}
+            </h3>
 
             {error && (
               <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/40 rounded-lg px-3 py-2 mb-4">
@@ -216,13 +258,15 @@ export default function SavingsGoals({ currency }: { currency: string }) {
             <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">Nom de l&apos;objectif</label>
             <input
               type="text"
-              placeholder="Ex. Laptop, vacances..."
+              placeholder="Ex. Ordinateur, vacances..."
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-4 bg-transparent text-sm"
             />
 
-            <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">Montant visé</label>
+            <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">
+              Montant visé ({currency})
+            </label>
             <input
               type="number"
               min="0"
@@ -245,7 +289,10 @@ export default function SavingsGoals({ currency }: { currency: string }) {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingGoal(null);
+                }}
                 className="flex-1 border border-zinc-300 dark:border-zinc-700 rounded-lg py-2 text-sm"
               >
                 Annuler
@@ -254,7 +301,7 @@ export default function SavingsGoals({ currency }: { currency: string }) {
                 type="submit"
                 className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-lg py-2 text-sm font-medium"
               >
-                Créer
+                {editingGoal ? "Enregistrer" : "Créer"}
               </button>
             </div>
           </form>

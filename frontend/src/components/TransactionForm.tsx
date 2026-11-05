@@ -5,6 +5,16 @@ import { Camera, X } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import CategoryManager from "./CategoryManager";
 
+export type TransactionData = {
+  _id: string;
+  type: "dépense" | "revenu";
+  amount: number;
+  category: string;
+  description: string;
+  date: string;
+  receiptImage?: string | null;
+};
+
 // Redimensionne et compresse une image côté navigateur avant envoi, pour
 // qu'une photo de téléphone (souvent plusieurs Mo) devienne une data URI
 // de quelques centaines de Ko — largement sous la limite du backend, et
@@ -38,22 +48,37 @@ function compressImage(file: File, maxWidth = 1000, quality = 0.7): Promise<stri
 export default function TransactionForm({
   onClose,
   initialType = "dépense",
+  transactionToEdit = null,
 }: {
   onClose: () => void;
-  // Permet d'ouvrir le formulaire directement sur "revenu" (raccourci PWA)
   initialType?: "dépense" | "revenu";
+  transactionToEdit?: TransactionData | null;
 }) {
-  const { categories, getCategories, addTransaction } = useTransactionStore();
+  const { categories, getCategories, addTransaction, updateTransaction } = useTransactionStore();
   const [showCategoryManager, setShowCategoryManager] = useState(false);
 
-  const [type, setType] = useState<"dépense" | "revenu">(initialType);
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [type, setType] = useState<"dépense" | "revenu">(
+    transactionToEdit ? transactionToEdit.type : initialType,
+  );
+  const [amount, setAmount] = useState(
+    transactionToEdit ? String(transactionToEdit.amount) : "",
+  );
+  const [category, setCategory] = useState(
+    transactionToEdit ? transactionToEdit.category : "",
+  );
+  const [description, setDescription] = useState(
+    transactionToEdit ? transactionToEdit.description || "" : "",
+  );
+  const [date, setDate] = useState(() =>
+    transactionToEdit
+      ? new Date(transactionToEdit.date).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10),
+  );
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [receiptImage, setReceiptImage] = useState<string | null>(
+    transactionToEdit ? transactionToEdit.receiptImage || null : null,
+  );
   const [isCompressing, setIsCompressing] = useState(false);
 
   const handleReceiptChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,14 +122,26 @@ export default function TransactionForm({
     }
 
     setIsSaving(true);
-    const result = await addTransaction({
-      type,
-      amount: Number(amount),
-      category,
-      description,
-      date,
-      receiptImage,
-    });
+    let result;
+    if (transactionToEdit) {
+      result = await updateTransaction(transactionToEdit._id, {
+        type,
+        amount: Number(amount),
+        category,
+        description,
+        date,
+        receiptImage,
+      });
+    } else {
+      result = await addTransaction({
+        type,
+        amount: Number(amount),
+        category,
+        description,
+        date,
+        receiptImage,
+      });
+    }
     setIsSaving(false);
 
     if (result.success) {
@@ -124,7 +161,9 @@ export default function TransactionForm({
         onClick={(e) => e.stopPropagation()}
         className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm"
       >
-        <h3 className="font-bold mb-4">Ajouter une transaction</h3>
+        <h3 className="font-bold mb-4">
+          {transactionToEdit ? "Modifier la transaction" : "Ajouter une transaction"}
+        </h3>
 
         {error && (
           <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/40 rounded-lg px-3 py-2 mb-4">
@@ -137,7 +176,9 @@ export default function TransactionForm({
             type="button"
             onClick={() => {
               setType("dépense");
-              setCategory("");
+              if (!transactionToEdit || transactionToEdit.type !== "dépense") {
+                setCategory("");
+              }
             }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
               type === "dépense"
@@ -151,7 +192,9 @@ export default function TransactionForm({
             type="button"
             onClick={() => {
               setType("revenu");
-              setCategory("");
+              if (!transactionToEdit || transactionToEdit.type !== "revenu") {
+                setCategory("");
+              }
             }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
               type === "revenu"
@@ -257,7 +300,13 @@ export default function TransactionForm({
             disabled={isSaving}
             className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50"
           >
-            {isSaving ? "Ajout..." : "Ajouter"}
+            {isSaving
+              ? transactionToEdit
+                ? "Modification..."
+                : "Ajout..."
+              : transactionToEdit
+              ? "Enregistrer"
+              : "Ajouter"}
           </button>
         </div>
       </form>

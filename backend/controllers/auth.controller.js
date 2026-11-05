@@ -296,3 +296,43 @@ exports.exportAccountData = async (req, res) => {
   }
 };
 
+// Permet à un utilisateur connecté de modifier son mot de passe directement
+// depuis ses paramètres sans avoir besoin de passer par un email.
+exports.updatePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Le mot de passe actuel et le nouveau mot de passe sont requis." });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Le nouveau mot de passe doit faire au moins 6 caractères." });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur introuvable." });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Le mot de passe actuel est incorrect." });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    // Incrémente tokenVersion pour invalider les autres sessions actives
+    user.tokenVersion += 1;
+    await user.save();
+
+    // Renouvelle le cookie JWT avec la nouvelle version pour maintenir la session en cours
+    generateTokenAndSetCookie(user._id, user.tokenVersion, res);
+
+    res.status(200).json({ message: "Mot de passe modifié avec succès." });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors du changement de mot de passe");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+
