@@ -1,17 +1,32 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Lightbulb, TrendingUp, TrendingDown, PiggyBank } from "lucide-react";
+import { Lightbulb, TrendingUp, TrendingDown, PiggyBank, Sparkles, Compass } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import { CategoryIcon } from "./categoryIcons";
 
-// Forme des données renvoyées par GET /transactions/insights (voir
-// insights.service.js côté backend)
+// Forme des données renvoyées par GET /transactions/insights (voir insights.service.js côté backend)
 type Insight =
   | { type: "overall"; direction: "up" | "down"; percent: number; current: number; average: number }
   | { type: "category_spike"; category: string; percent: number; current: number; average: number }
   | { type: "category_drop"; category: string; percent: number; current: number; average: number }
-  | { type: "savings_rate"; rate: number; income: number; expense: number };
+  | { type: "savings_rate"; rate: number; income: number; expense: number }
+  | {
+      type: "month_projection";
+      projectedTotal: number;
+      currentTotal: number;
+      dailyAverage: number;
+      projectedSavings: number | null;
+      currentIncome: number;
+      daysLeft: number;
+    }
+  | {
+      type: "smart_tip";
+      category: string;
+      percentage: number;
+      amount: number;
+      tip: string;
+    };
 
 type InsightsData = {
   partial: boolean;
@@ -27,7 +42,7 @@ type CategoryDoc = {
   color?: string;
 };
 
-type Tone = "good" | "warn" | "bad" | "neutral";
+type Tone = "good" | "warn" | "bad" | "neutral" | "ai";
 
 const TONE_STYLES: Record<Tone, { text: string; circle: string }> = {
   good: {
@@ -46,14 +61,16 @@ const TONE_STYLES: Record<Tone, { text: string; circle: string }> = {
     text: "text-zinc-500",
     circle: "bg-zinc-100 dark:bg-zinc-800 text-zinc-500",
   },
+  ai: {
+    text: "text-purple-600 dark:text-purple-400",
+    circle: "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400",
+  },
 };
 
 function formatAmount(amount: number, currency: string) {
   return `${Math.round(amount).toLocaleString("fr-FR")} ${currency}`;
 }
 
-// Pastille d'icône teintée selon le ton de l'observation, pour les
-// insights qui ne concernent pas une catégorie précise
 function ToneIcon({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
     <span
@@ -70,6 +87,39 @@ function describeInsight(
   categories: CategoryDoc[],
 ): { icon: ReactNode; tone: Tone; title: string; detail: string } {
   switch (insight.type) {
+    case "month_projection": {
+      const willSave = insight.projectedSavings !== null && insight.projectedSavings > 0;
+      return {
+        icon: (
+          <ToneIcon tone="ai">
+            <Sparkles size={16} strokeWidth={2} />
+          </ToneIcon>
+        ),
+        tone: "ai",
+        title: `Projection fin de mois : ~${formatAmount(insight.projectedTotal, currency)} de dépenses`,
+        detail: `Au rythme de ${formatAmount(insight.dailyAverage, currency)}/jour (${insight.daysLeft}j restants)${
+          insight.projectedSavings !== null
+            ? willSave
+              ? ` · Épargne estimée : +${formatAmount(insight.projectedSavings, currency)}`
+              : ` · Dépassement estimé : ${formatAmount(Math.abs(insight.projectedSavings), currency)}`
+            : ""
+        }`,
+      };
+    }
+
+    case "smart_tip": {
+      return {
+        icon: (
+          <ToneIcon tone="ai">
+            <Compass size={16} strokeWidth={2} />
+          </ToneIcon>
+        ),
+        tone: "ai",
+        title: `Conseil IA FinTrack : Poste ${insight.category}`,
+        detail: insight.tip,
+      };
+    }
+
     case "overall": {
       const up = insight.direction === "up";
       return {
@@ -126,10 +176,10 @@ function describeInsight(
 
 function subtitle(data: InsightsData) {
   if (!data.comparable) {
-    return "Les comparaisons avec tes mois précédents apparaîtront après quelques jours d'activité.";
+    return "Analyses intelligentes et projections en temps réel de votre activité.";
   }
   if (data.comparedMonths === 0) {
-    return "Les comparaisons apparaîtront dès que tu auras un mois d'historique.";
+    return "Les comparaisons historiques apparaîtront dès que vous aurez un mois d'activité.";
   }
   const n = data.comparedMonths;
   if (data.partial) {
@@ -147,31 +197,31 @@ export default function InsightsCards({
   currency: string;
   categories?: CategoryDoc[];
 }) {
-  // Le store est un fichier .js non typé : sans cette précision,
-  // TypeScript infère `null` et refuse tout accès aux champs
   const data = useTransactionStore((state) => state.insights) as InsightsData | null;
 
   if (!data || data.insights.length === 0) return null;
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
-      <div className="mb-4">
-        <h3 className="font-semibold flex items-center gap-2">
-          <Lightbulb size={18} className="text-accent-600" strokeWidth={2} />
-          Analyse du mois
-        </h3>
-        <p className="text-xs text-zinc-500 mt-0.5">{subtitle(data)}</p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold flex items-center gap-2">
+            <Sparkles size={18} className="text-purple-600 dark:text-purple-400" strokeWidth={2} />
+            Coach Financier & Analyses IA
+          </h3>
+          <p className="text-xs text-zinc-500 mt-0.5">{subtitle(data)}</p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">
         {data.insights.map((insight, index) => {
           const { icon, tone, title, detail } = describeInsight(insight, currency, categories);
           return (
-            <div key={`${insight.type}-${index}`} className="flex items-center gap-3">
+            <div key={`${insight.type}-${index}`} className="flex items-start gap-3">
               {icon}
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium ${TONE_STYLES[tone].text}`}>{title}</p>
-                <p className="text-xs text-zinc-400">{detail}</p>
+                <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">{detail}</p>
               </div>
             </div>
           );

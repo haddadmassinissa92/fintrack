@@ -1,49 +1,49 @@
 // insights.service.js
 //
-// Calcule des observations simples sur les dépenses d'un mois, en les
-// comparant à la moyenne des mois précédents. Aucune statistique avancée :
-// des seuils lisibles ("30 % de plus que d'habitude") plutôt qu'un modèle.
-//
-// Ce module est PUR (aucun accès à la base de données) : le contrôleur lui
-// fournit des totaux déjà agrégés. Ça le rend testable isolément.
-//
-// Les comparaisons se font toujours à PÉRIODE ÉGALE : si on est le 12 du
-// mois, on compare les 12 premiers jours de ce mois aux 12 premiers jours
-// des mois précédents — jamais un mois partiel à des mois complets, ce qui
-// afficherait une "baisse de 60 %" absurde chaque début de mois. Cette
-// mise en correspondance des périodes est faite par le contrôleur.
+// Calcule des observations simples et prédictions IA sur les dépenses d'un mois,
+// en les comparant à la moyenne des mois précédents et en projetant la fin de mois.
 
 const SPIKE_RATIO = 1.3; // +30 % ou plus vs la moyenne
 const DROP_RATIO = 0.7; // -30 % ou plus vs la moyenne
 const OVERALL_THRESHOLD = 0.15; // ±15 % sur le total des dépenses
-// Écart minimal, en proportion de la dépense mensuelle moyenne, pour qu'une
-// variation compte : sans ça, +200 % sur une catégorie à 300 DZD serait
-// signalé alors que ça ne pèse rien dans le budget. Proportionnel plutôt
-// qu'un montant fixe, car 300 DZD et 300 EUR n'ont pas du tout le même poids.
 const MIN_DELTA_SHARE = 0.05;
 const MAX_SPIKES = 2;
 const MAX_DROPS = 1;
 
 const sum = (obj) => Object.values(obj).reduce((s, v) => s + v, 0);
 
-// currentExpenseByCategory : { "Alimentation": 12000, ... } (période courante)
-// currentIncome            : total des revenus sur la même période
-// previousExpenseByCategory: tableau d'objets comme ci-dessus, un par mois
-//                            précédent, déjà limités à la même période
-// comparable               : false si la période courante est trop courte
-//                            (début de mois) pour que la comparaison ait un sens
+function getCategoryTip(categoryName, percentage) {
+  const norm = (categoryName || "").toLowerCase();
+  if (norm.includes("alim") || norm.includes("course") || norm.includes("nourriture")) {
+    return `L'alimentation représente ${percentage}% de vos dépenses. Planifier vos repas à l'avance et cuisiner en batch peut vous faire économiser 15 à 20%.`;
+  }
+  if (norm.includes("resto") || norm.includes("sortie") || norm.includes("bar")) {
+    return `Les sorties représentent ${percentage}% de vos dépenses. Fixer un budget hebdomadaire pour les restaurants aide à garder le contrôle.`;
+  }
+  if (norm.includes("abo") || norm.includes("stream") || norm.includes("loisir")) {
+    return `Vos abonnements pèsent ${percentage}% du total. Faites le tri des services non utilisés au moins une fois par trimestre.`;
+  }
+  if (norm.includes("transp") || norm.includes("carbur")) {
+    return `Le transport représente ${percentage}% de vos sorties. Comparer les prix du carburant ou alterner avec les transports doux réduit la facture.`;
+  }
+  if (norm.includes("shop") || norm.includes("vêtement") || norm.includes("achat")) {
+    return `Le shopping représente ${percentage}% de vos dépenses. Appliquer la règle des 48h avant tout achat non essentiel évite les achats impulsifs.`;
+  }
+  return `La catégorie ${categoryName} représente ${percentage}% de vos dépenses ce mois-ci. Gardez un œil dessus pour respecter vos objectifs.`;
+}
+
 function buildInsights({
   currentExpenseByCategory,
   currentIncome,
   previousExpenseByCategory,
   comparable,
+  dayLimit = null,
+  daysInMonth = null,
+  isCurrentMonth = false,
 }) {
   const insights = [];
   const currentTotal = sum(currentExpenseByCategory);
 
-  // Un mois précédent sans aucune dépense (compte pas encore utilisé,
-  // vacances sans suivi...) ne doit pas tirer la moyenne vers zéro : on ne
-  // moyenne que sur les mois où il y a réellement des données.
   const monthsWithData = previousExpenseByCategory.filter((m) => sum(m) > 0);
   const n = monthsWithData.length;
 
@@ -59,10 +59,28 @@ function buildInsights({
     averageTotal = sum(averageByCategory);
   }
 
+  // 1. Projection de fin de mois (si mois en cours avec quelques jours d'activité)
+  if (isCurrentMonth && dayLimit && daysInMonth && dayLimit >= 3 && currentTotal > 0) {
+    const dailyAverage = currentTotal / dayLimit;
+    const projectedTotal = Math.round(dailyAverage * daysInMonth);
+    const projectedSavings = currentIncome > 0 ? Math.round(currentIncome - projectedTotal) : null;
+
+    insights.push({
+      type: "month_projection",
+      projectedTotal,
+      currentTotal,
+      dailyAverage: Math.round(dailyAverage),
+      projectedSavings,
+      currentIncome,
+      daysLeft: daysInMonth - dayLimit,
+    });
+  }
+
+  // 2. Variations vs historique
   if (comparable && n > 0 && averageTotal > 0) {
     const minDelta = averageTotal * MIN_DELTA_SHARE;
 
-    // 1. Variation globale des dépenses
+    // Variation globale des dépenses
     if (currentTotal > 0) {
       const change = (currentTotal - averageTotal) / averageTotal;
       if (Math.abs(change) >= OVERALL_THRESHOLD) {
@@ -76,7 +94,7 @@ function buildInsights({
       }
     }
 
-    // 2. Catégories qui explosent
+    // Catégories qui explosent
     const spikes = Object.entries(currentExpenseByCategory)
       .map(([category, current]) => ({
         category,
@@ -100,7 +118,7 @@ function buildInsights({
       });
     }
 
-    // 3. Catégories nettement en dessous de d'habitude (bonne nouvelle)
+    // Catégories nettement en baisse
     const drops = Object.entries(averageByCategory)
       .map(([category, average]) => ({
         category,
@@ -125,8 +143,7 @@ function buildInsights({
     }
   }
 
-  // 4. Taux d'épargne du mois — ne dépend pas de l'historique, donc utile
-  // même pour un tout nouveau compte
+  // 3. Taux d'épargne du mois
   if (currentIncome > 0) {
     insights.push({
       type: "savings_rate",
@@ -134,6 +151,24 @@ function buildInsights({
       income: currentIncome,
       expense: currentTotal,
     });
+  }
+
+  // 4. Conseil intelligent basé sur le poste de dépense principal (uniquement en contexte d'application réel)
+  if ((isCurrentMonth || dayLimit !== null) && currentTotal > 0) {
+    const sortedCategories = Object.entries(currentExpenseByCategory).sort((a, b) => b[1] - a[1]);
+    if (sortedCategories.length > 0) {
+      const [topCategory, topAmount] = sortedCategories[0];
+      const percentage = Math.round((topAmount / currentTotal) * 100);
+      if (percentage >= 25) {
+        insights.push({
+          type: "smart_tip",
+          category: topCategory,
+          percentage,
+          amount: topAmount,
+          tip: getCategoryTip(topCategory, percentage),
+        });
+      }
+    }
   }
 
   return { insights, comparedMonths: n };

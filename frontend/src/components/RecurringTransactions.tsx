@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Repeat, Plus, Trash2, Pause, Play, Pencil } from "lucide-react";
+import { Repeat, Plus, Trash2, Pause, Play, Pencil, RefreshCw } from "lucide-react";
 import { useRecurringStore } from "@/store/useRecurringStore";
 import { useTransactionStore } from "@/store/useTransactionStore";
 
@@ -27,10 +27,12 @@ function formatAmount(amount: number, currency: string) {
 }
 
 export default function RecurringTransactions({ currency }: { currency: string }) {
-  const { recurring, getRecurring, createRecurring, updateRecurring, toggleActive, deleteRecurring } = useRecurringStore();
+  const { recurring, getRecurring, createRecurring, updateRecurring, toggleActive, deleteRecurring, processRecurring } = useRecurringStore();
   const { categories, getCategories } = useTransactionStore();
   const [showForm, setShowForm] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<Recurring | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [type, setType] = useState<"dépense" | "revenu">("dépense");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -45,6 +47,24 @@ export default function RecurringTransactions({ currency }: { currency: string }
   }, [getRecurring, getCategories]);
 
   const availableCategories = type === "dépense" ? categories.expense : categories.income;
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncMessage(null);
+    const res = await processRecurring();
+    setIsSyncing(false);
+    if (res.success) {
+      if (res.count && res.count > 0) {
+        setSyncMessage(`✨ ${res.count} transaction(s) générée(s) automatiquement.`);
+        // Rafraîchir aussi les transactions et stats globales
+        useTransactionStore.getState().getTransactions(useTransactionStore.getState().lastFilters);
+        useTransactionStore.getState().getStats(useTransactionStore.getState().statsMonthYear || {});
+      } else {
+        setSyncMessage("Toutes vos récurrences sont à jour.");
+      }
+      setTimeout(() => setSyncMessage(null), 4000);
+    }
+  };
 
   const handleOpenAdd = () => {
     setEditingRecurring(null);
@@ -112,19 +132,41 @@ export default function RecurringTransactions({ currency }: { currency: string }
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold flex items-center gap-2">
-          <Repeat size={16} className="text-accent-600" />
-          Transactions récurrentes
-        </h3>
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center gap-1 text-xs text-accent-600 border border-accent-600 rounded-full px-2.5 py-1 hover:bg-accent-50 dark:hover:bg-accent-950 transition"
-        >
-          <Plus size={13} strokeWidth={2.5} />
-          Ajouter
-        </button>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h3 className="font-semibold flex items-center gap-2">
+            <Repeat size={16} className="text-accent-600" />
+            Transactions récurrentes & Abonnements
+          </h3>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Génération automatique sur votre compte à chaque date d&apos;échéance
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            title="Vérifier les échéances"
+            className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 rounded-full px-2.5 py-1 hover:border-accent-500 hover:text-accent-600 transition disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={isSyncing ? "animate-spin" : ""} />
+            {isSyncing ? "Vérification..." : "Actualiser"}
+          </button>
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center gap-1 text-xs text-accent-600 border border-accent-600 rounded-full px-2.5 py-1 hover:bg-accent-50 dark:hover:bg-accent-950 transition"
+          >
+            <Plus size={13} strokeWidth={2.5} />
+            Ajouter
+          </button>
+        </div>
       </div>
+
+      {syncMessage && (
+        <p className="text-xs text-accent-700 dark:text-accent-400 bg-accent-50 dark:bg-accent-950/40 border border-accent-200 dark:border-accent-900/50 rounded-lg px-3 py-2 mb-4">
+          {syncMessage}
+        </p>
+      )}
 
       {recurring.length === 0 ? (
         <p className="text-sm text-zinc-400 text-center py-6">

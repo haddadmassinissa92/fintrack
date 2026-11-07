@@ -1,9 +1,9 @@
 // recurringTransaction.service.js
 //
-// Tâche de fond qui vérifie périodiquement si des transactions récurrentes
+// Tâche de fond et exécution à la demande qui vérifie périodiquement si des transactions récurrentes
 // sont arrivées à échéance (nextDueDate dépassée), crée alors la vraie
 // transaction correspondante, et avance nextDueDate à la prochaine
-// occurrence — même principe que les messages programmés de PladiChat.
+// occurrence.
 
 const RecurringTransaction = require("./models/recurringTransaction.model");
 const Transaction = require("./models/transaction.model");
@@ -11,11 +11,7 @@ const logger = require("./logger");
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // vérifie toutes les heures
 
-// Calcule la prochaine échéance à partir de la fréquence choisie — repart
-// toujours de la date d'échéance qui vient de passer (pas de "maintenant"),
-// pour que la date reste régulière même si le serveur était éteint au
-// moment exact de l'échéance (ex. toujours le 1er du mois, jamais un
-// glissement progressif vers une autre date)
+// Calcule la prochaine échéance à partir de la fréquence choisie
 function computeNextDueDate(currentDueDate, frequency) {
   const next = new Date(currentDueDate);
   if (frequency === "weekly") {
@@ -28,12 +24,20 @@ function computeNextDueDate(currentDueDate, frequency) {
   return next;
 }
 
-async function processDueRecurringTransactions() {
+/**
+ * Traite les transactions récurrentes échues, soit pour tous les utilisateurs,
+ * soit pour un utilisateur spécifique (à la demande lorsqu'il consulte son compte).
+ */
+async function processDueRecurringTransactions(userId = null) {
   try {
-    const due = await RecurringTransaction.find({
+    const filter = {
       active: true,
       nextDueDate: { $lte: new Date() },
-    });
+    };
+    if (userId) filter.user = userId;
+
+    const due = await RecurringTransaction.find(filter);
+    let createdCount = 0;
 
     for (const recurring of due) {
       try {
@@ -45,10 +49,10 @@ async function processDueRecurringTransactions() {
           description: recurring.description,
           date: recurring.nextDueDate,
         });
+        createdCount++;
 
         // Avance potentiellement plusieurs fois d'affilée si le serveur
-        // est resté éteint longtemps (ex. plusieurs mois manqués) — pour
-        // rattraper toutes les échéances passées, pas seulement la première
+        // est resté éteint longtemps pour rattraper toutes les échéances passées
         let nextDate = computeNextDueDate(recurring.nextDueDate, recurring.frequency);
         while (nextDate <= new Date()) {
           await Transaction.create({
@@ -59,6 +63,7 @@ async function processDueRecurringTransactions() {
             description: recurring.description,
             date: nextDate,
           });
+          createdCount++;
           nextDate = computeNextDueDate(nextDate, recurring.frequency);
         }
 
@@ -68,17 +73,19 @@ async function processDueRecurringTransactions() {
         logger.error({ err: error }, "Erreur lors de la génération d'une transaction récurrente");
       }
     }
+    return createdCount;
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la vérification des transactions récurrentes");
+    return 0;
   }
 }
 
 function startRecurringTransactionDispatcher() {
-  // Un premier passage tout de suite au démarrage (utile si le serveur
-  // était éteint et qu'une échéance est déjà passée), puis à intervalle
-  // régulier ensuite
   processDueRecurringTransactions();
   setInterval(processDueRecurringTransactions, CHECK_INTERVAL_MS);
 }
 
-module.exports = { startRecurringTransactionDispatcher };
+module.exports = {
+  startRecurringTransactionDispatcher,
+  processDueRecurringTransactions,
+};

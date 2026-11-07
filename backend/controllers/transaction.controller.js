@@ -608,6 +608,9 @@ exports.getInsights = async (req, res) => {
       currentIncome,
       previousExpenseByCategory,
       comparable,
+      dayLimit,
+      daysInMonth,
+      isCurrentMonth,
     });
 
     res.status(200).json({

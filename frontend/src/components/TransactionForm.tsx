@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Camera, X } from "lucide-react";
+import { Camera, X, Sparkles } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import CategoryManager from "./CategoryManager";
+import { predictCategory, type PredictionResult } from "@/lib/categorizer";
 
 export type TransactionData = {
   _id: string;
@@ -15,10 +16,7 @@ export type TransactionData = {
   receiptImage?: string | null;
 };
 
-// Redimensionne et compresse une image côté navigateur avant envoi, pour
-// qu'une photo de téléphone (souvent plusieurs Mo) devienne une data URI
-// de quelques centaines de Ko — largement sous la limite du backend, et
-// beaucoup plus rapide à envoyer.
+// Redimensionne et compresse une image côté navigateur avant envoi
 function compressImage(file: File, maxWidth = 1000, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -54,7 +52,7 @@ export default function TransactionForm({
   initialType?: "dépense" | "revenu";
   transactionToEdit?: TransactionData | null;
 }) {
-  const { categories, getCategories, addTransaction, updateTransaction } = useTransactionStore();
+  const { categories, getCategories, addTransaction, updateTransaction, transactions } = useTransactionStore();
   const [showCategoryManager, setShowCategoryManager] = useState(false);
 
   const [type, setType] = useState<"dépense" | "revenu">(
@@ -81,9 +79,39 @@ export default function TransactionForm({
   );
   const [isCompressing, setIsCompressing] = useState(false);
 
+  // IA : Prédiction et auto-catégorisation
+  const [isCategoryManuallySet, setIsCategoryManuallySet] = useState(Boolean(transactionToEdit));
+  const [aiSuggestion, setAiSuggestion] = useState<PredictionResult | null>(null);
+
+  const availableCategories = type === "dépense" ? categories.expense : categories.income;
+
+  useEffect(() => {
+    getCategories();
+  }, [getCategories]);
+
+  // Analyse intelligente de la description en temps réel
+  const handleDescriptionChange = (text: string) => {
+    setDescription(text);
+
+    if (isCategoryManuallySet && category) return;
+
+    const allCatNames = [...(categories.expense || []), ...(categories.income || [])];
+    const prediction = predictCategory(text, allCatNames, transactions);
+
+    if (prediction) {
+      setAiSuggestion(prediction);
+      if (prediction.suggestedType && prediction.suggestedType !== type) {
+        setType(prediction.suggestedType);
+      }
+      setCategory(prediction.category);
+    } else {
+      setAiSuggestion(null);
+    }
+  };
+
   const handleReceiptChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    e.target.value = ""; // permet de resélectionner le même fichier ensuite
+    e.target.value = "";
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
@@ -102,12 +130,6 @@ export default function TransactionForm({
       setIsCompressing(false);
     }
   };
-
-  useEffect(() => {
-    getCategories();
-  }, [getCategories]);
-
-  const availableCategories = type === "dépense" ? categories.expense : categories.income;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,9 +181,9 @@ export default function TransactionForm({
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm"
+        className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto"
       >
-        <h3 className="font-bold mb-4">
+        <h3 className="font-bold mb-4 text-base">
           {transactionToEdit ? "Modifier la transaction" : "Ajouter une transaction"}
         </h3>
 
@@ -178,6 +200,7 @@ export default function TransactionForm({
               setType("dépense");
               if (!transactionToEdit || transactionToEdit.type !== "dépense") {
                 setCategory("");
+                setIsCategoryManuallySet(false);
               }
             }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
@@ -194,6 +217,7 @@ export default function TransactionForm({
               setType("revenu");
               if (!transactionToEdit || transactionToEdit.type !== "revenu") {
                 setCategory("");
+                setIsCategoryManuallySet(false);
               }
             }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
@@ -206,58 +230,83 @@ export default function TransactionForm({
           </button>
         </div>
 
+        {/* Description / Libellé avec Auto-catégorisation IA */}
+        <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">
+          Libellé / Titre
+        </label>
+        <input
+          type="text"
+          placeholder="Ex: Courses Carrefour, Uber, Netflix..."
+          value={description}
+          onChange={(e) => handleDescriptionChange(e.target.value)}
+          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-2 bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
+        />
+
+        {/* Suggestion IA affichée */}
+        {aiSuggestion && (
+          <div className="flex items-center gap-1.5 text-xs text-accent-600 dark:text-accent-400 bg-accent-50 dark:bg-accent-950/30 px-2.5 py-1.5 rounded-lg mb-3">
+            <Sparkles size={13} className="shrink-0" />
+            <span>
+              Catégorie auto-détectée : <strong>{aiSuggestion.category}</strong> ({aiSuggestion.reason})
+            </span>
+          </div>
+        )}
+
+        {/* Montant */}
         <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">Montant</label>
         <input
           type="number"
           step="0.01"
           min="0"
+          placeholder="0.00"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-4 bg-transparent text-sm"
+          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-4 bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
         />
 
-        <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">Catégorie</label>
+        {/* Catégorie */}
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Catégorie</label>
+          <button
+            type="button"
+            onClick={() => setShowCategoryManager(true)}
+            className="text-xs text-accent-600 hover:underline"
+          >
+            Gérer
+          </button>
+        </div>
         <select
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-1 bg-white dark:bg-zinc-900 text-sm"
+          onChange={(e) => {
+            setCategory(e.target.value);
+            setIsCategoryManuallySet(true);
+            setAiSuggestion(null);
+          }}
+          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-4 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
         >
-          <option value="">Choisir...</option>
+          <option value="">Choisir une catégorie...</option>
           {availableCategories.map((c: string) => (
             <option key={c} value={c}>
               {c}
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={() => setShowCategoryManager(true)}
-          className="text-xs text-accent-600 mb-4 block"
-        >
-          Gérer les catégories
-        </button>
 
-        <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">Description (optionnel)</label>
-        <input
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-4 bg-transparent text-sm"
-        />
-
+        {/* Date */}
         <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">Date</label>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-6 bg-transparent text-sm"
+          className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-4 bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
         />
 
+        {/* Photo du reçu */}
         <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">
           Reçu (optionnel)
         </label>
         {receiptImage ? (
-          <div className="relative inline-block mb-6">
+          <div className="relative inline-block mb-5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={receiptImage}
@@ -274,7 +323,7 @@ export default function TransactionForm({
             </button>
           </div>
         ) : (
-          <label className="flex items-center gap-2 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-6 text-sm text-zinc-500 cursor-pointer hover:border-accent-500 transition w-fit">
+          <label className="flex items-center gap-2 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 mb-5 text-sm text-zinc-500 cursor-pointer hover:border-accent-500 transition w-fit">
             <Camera size={15} strokeWidth={2} />
             {isCompressing ? "Traitement..." : "Ajouter une photo"}
             <input
@@ -291,14 +340,14 @@ export default function TransactionForm({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 border border-zinc-300 dark:border-zinc-700 rounded-lg py-2 text-sm"
+            className="flex-1 border border-zinc-300 dark:border-zinc-700 rounded-lg py-2 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition"
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={isSaving}
-            className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50"
+            className="flex-1 bg-accent-600 hover:bg-accent-700 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50 transition"
           >
             {isSaving
               ? transactionToEdit

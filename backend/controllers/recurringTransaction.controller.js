@@ -3,6 +3,7 @@
 const RecurringTransaction = require("../models/recurringTransaction.model");
 const Category = require("../models/category.model");
 const logger = require("../logger");
+const { processDueRecurringTransactions } = require("../recurringTransaction.service");
 
 const isValidCategory = async (userId, type, categoryName) => {
   const category = await Category.findOne({ user: userId, type, name: categoryName });
@@ -11,10 +12,24 @@ const isValidCategory = async (userId, type, categoryName) => {
 
 exports.getRecurringTransactions = async (req, res) => {
   try {
+    // Déclenchement automatique à la consultation pour rattraper toute échéance échue
+    await processDueRecurringTransactions(req.user._id);
+
     const recurring = await RecurringTransaction.find({ user: req.user._id }).sort({ nextDueDate: 1 });
     res.status(200).json(recurring);
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la récupération des transactions récurrentes");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Traitement explicite des récurrences avec retour du nombre généré
+exports.processRecurring = async (req, res) => {
+  try {
+    const count = await processDueRecurringTransactions(req.user._id);
+    res.status(200).json({ message: `${count} transaction(s) récurrente(s) traitée(s).`, processedCount: count });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors du traitement forcé des transactions récurrentes");
     res.status(500).json({ message: "Erreur serveur." });
   }
 };

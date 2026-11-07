@@ -56,4 +56,15 @@ export const useRecurringStore = create((set, get) => ({
       console.error(error);
     }
   },
+
+  // Déclenche la vérification et génération immédiate des récurrences échues
+  processRecurring: async () => {
+    try {
+      const res = await axiosInstance.post("/recurring/process");
+      await get().getRecurring();
+      return { success: true, count: res.data.processedCount };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
 }));
