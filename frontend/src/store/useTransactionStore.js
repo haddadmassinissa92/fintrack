@@ -93,6 +93,12 @@ export const useTransactionStore = create((set, get) => ({
       if (filters.search) params.set("search", filters.search);
       if (filters.month) params.set("month", filters.month);
       if (filters.year) params.set("year", filters.year);
+      if (filters.minAmount !== undefined && filters.minAmount !== "") params.set("minAmount", filters.minAmount);
+      if (filters.maxAmount !== undefined && filters.maxAmount !== "") params.set("maxAmount", filters.maxAmount);
+      if (filters.startDate) params.set("startDate", filters.startDate);
+      if (filters.endDate) params.set("endDate", filters.endDate);
+      if (filters.sortBy) params.set("sortBy", filters.sortBy);
+      if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
       params.set("page", "1");
 
       const res = await axiosInstance.get(`/transactions?${params.toString()}`);
@@ -123,6 +129,12 @@ export const useTransactionStore = create((set, get) => ({
       if (lastFilters.search) params.set("search", lastFilters.search);
       if (lastFilters.month) params.set("month", lastFilters.month);
       if (lastFilters.year) params.set("year", lastFilters.year);
+      if (lastFilters.minAmount !== undefined && lastFilters.minAmount !== "") params.set("minAmount", lastFilters.minAmount);
+      if (lastFilters.maxAmount !== undefined && lastFilters.maxAmount !== "") params.set("maxAmount", lastFilters.maxAmount);
+      if (lastFilters.startDate) params.set("startDate", lastFilters.startDate);
+      if (lastFilters.endDate) params.set("endDate", lastFilters.endDate);
+      if (lastFilters.sortBy) params.set("sortBy", lastFilters.sortBy);
+      if (lastFilters.sortOrder) params.set("sortOrder", lastFilters.sortOrder);
       params.set("page", String(page + 1));
 
       const res = await axiosInstance.get(`/transactions?${params.toString()}`);

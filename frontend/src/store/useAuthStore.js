@@ -55,6 +55,26 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  updateProfile: async (username, email) => {
+    try {
+      const res = await axiosInstance.put("/auth/profile", { username, email });
+      set({ authUser: { ...get().authUser, ...res.data } });
+      return { success: true, user: res.data };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
+  deleteAccount: async () => {
+    try {
+      await axiosInstance.delete("/auth/me");
+      set({ authUser: null });
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
   forgotPassword: async (email) => {
     try {
       const res = await axiosInstance.post("/auth/forgot-password", { email });

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Target, Plus, Trash2, Pencil, X } from "lucide-react";
 import { useGoalStore } from "@/store/useGoalStore";
+import { useTransactionStore } from "@/store/useTransactionStore";
 
 type Goal = {
   _id: string;
@@ -50,6 +51,7 @@ export default function SavingsGoals({ currency }: { currency: string }) {
   const [error, setError] = useState("");
   const [contributingId, setContributingId] = useState<string | null>(null);
   const [contributionAmount, setContributionAmount] = useState("");
+  const [syncTransaction, setSyncTransaction] = useState(false);
 
   useEffect(() => {
     getGoals();
@@ -107,11 +109,24 @@ export default function SavingsGoals({ currency }: { currency: string }) {
     }
   };
 
-  const handleContribute = async (id: string) => {
-    if (!contributionAmount || Number(contributionAmount) === 0) return;
-    await contribute(id, Number(contributionAmount));
+  const handleContribute = async (goal: Goal) => {
+    const num = Number(contributionAmount);
+    if (!contributionAmount || num === 0) return;
+    await contribute(goal._id, num);
+
+    if (syncTransaction && num > 0) {
+      await useTransactionStore.getState().addTransaction({
+        title: `Épargne : ${goal.name}`,
+        amount: num,
+        type: "dépense",
+        category: "Épargne",
+        date: new Date().toISOString(),
+      });
+    }
+
     setContributingId(null);
     setContributionAmount("");
+    setSyncTransaction(false);
   };
 
   return (
@@ -195,32 +210,51 @@ export default function SavingsGoals({ currency }: { currency: string }) {
                 )}
 
                 {contributingId === goal._id ? (
-                  <div className="flex items-center gap-2 mt-2">
-                    <input
-                      type="number"
-                      autoFocus
-                      placeholder="Montant (+ ou -)"
-                      value={contributionAmount}
-                      onChange={(e) => setContributionAmount(e.target.value)}
-                      className="flex-1 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2 py-1 bg-transparent text-sm"
-                    />
-                    <button
-                      onClick={() => handleContribute(goal._id)}
-                      className="text-xs bg-accent-600 text-white rounded-lg px-3 py-1"
-                    >
-                      OK
-                    </button>
-                    <button
-                      onClick={() => setContributingId(null)}
-                      aria-label="Annuler"
-                      className="text-zinc-400"
-                    >
-                      <X size={14} strokeWidth={2} />
-                    </button>
+                  <div className="space-y-2 mt-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        autoFocus
+                        placeholder="Montant (+ ou -)"
+                        value={contributionAmount}
+                        onChange={(e) => setContributionAmount(e.target.value)}
+                        className="flex-1 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2 py-1 bg-transparent text-sm"
+                      />
+                      <button
+                        onClick={() => handleContribute(goal)}
+                        className="text-xs bg-accent-600 text-white rounded-lg px-3 py-1 font-medium hover:bg-accent-700 transition"
+                      >
+                        OK
+                      </button>
+                      <button
+                        onClick={() => {
+                          setContributingId(null);
+                          setSyncTransaction(false);
+                        }}
+                        aria-label="Annuler"
+                        className="text-zinc-400 hover:text-zinc-600"
+                      >
+                        <X size={14} strokeWidth={2} />
+                      </button>
+                    </div>
+                    {Number(contributionAmount) > 0 && (
+                      <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={syncTransaction}
+                          onChange={(e) => setSyncTransaction(e.target.checked)}
+                          className="rounded text-accent-600 focus:ring-accent-500"
+                        />
+                        <span>Déduire de mon solde (créer une dépense Épargne)</span>
+                      </label>
+                    )}
                   </div>
                 ) : (
                   <button
-                    onClick={() => setContributingId(goal._id)}
+                    onClick={() => {
+                      setContributingId(goal._id);
+                      setSyncTransaction(false);
+                    }}
                     className="text-xs text-accent-600 mt-1"
                   >
                     + Ajouter une contribution

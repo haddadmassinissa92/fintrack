@@ -72,30 +72,49 @@ exports.createTransaction = async (req, res) => {
 // toutes les transactions d'un coup, même si l'appelant les omet.
 exports.getTransactions = async (req, res) => {
   try {
-    const { month, year, type, category, search } = req.query;
+    const { month, year, type, category, search, minAmount, maxAmount, startDate, endDate, sortBy, sortOrder } = req.query;
     const filter = { user: req.user._id };
 
     if (type) filter.type = type;
     if (category) filter.category = category;
 
     // Recherche texte simple, insensible à la casse, sur la description
-    // (ex. "courses" retrouve "Courses de la semaine")
     if (search && search.trim()) {
       filter.description = { $regex: search.trim(), $options: "i" };
     }
 
-    if (month && year) {
+    // Filtre par montant min/max
+    if (minAmount || maxAmount) {
+      filter.amount = {};
+      if (minAmount && Number(minAmount) >= 0) filter.amount.$gte = Number(minAmount);
+      if (maxAmount && Number(maxAmount) > 0) filter.amount.$lte = Number(maxAmount);
+    }
+
+    // Filtre par dates : plage personnalisée prioritaire, sinon mois/année
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    } else if (month && year) {
       const start = new Date(Number(year), Number(month) - 1, 1);
       const end = new Date(Number(year), Number(month), 1);
       filter.date = { $gte: start, $lt: end };
     }
+
+    const sortField = sortBy === "amount" ? "amount" : "date";
+    const sortDirection = sortOrder === "asc" ? 1 : -1;
+    const sortOptions = { [sortField]: sortDirection };
 
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const skip = (page - 1) * limit;
 
     const [transactions, total] = await Promise.all([
-      Transaction.find(filter).sort({ date: -1 }).skip(skip).limit(limit),
+      Transaction.find(filter).sort(sortOptions).skip(skip).limit(limit),
       Transaction.countDocuments(filter),
     ]);
 

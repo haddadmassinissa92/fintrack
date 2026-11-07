@@ -10,6 +10,8 @@ const Budget = require("../models/budget.model");
 const SavingsGoal = require("../models/savingsGoal.model");
 const RecurringTransaction = require("../models/recurringTransaction.model");
 const Debt = require("../models/debt.model");
+const PushSubscription = require("../models/pushSubscription.model");
+const AccountShare = require("../models/accountShare.model");
 const {
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
@@ -331,6 +333,84 @@ exports.updatePassword = async (req, res) => {
     res.status(200).json({ message: "Mot de passe modifié avec succès." });
   } catch (error) {
     logger.error({ err: error }, "Erreur lors du changement de mot de passe");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Modification du profil (nom d'utilisateur et/ou adresse email)
+exports.updateProfile = async (req, res) => {
+  try {
+    const { username, email } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur introuvable." });
+    }
+
+    if (username && username.trim()) {
+      const cleanUsername = username.trim();
+      if (cleanUsername.length < 3) {
+        return res.status(400).json({ message: "Le nom d'utilisateur doit contenir au moins 3 caractères." });
+      }
+      if (cleanUsername !== user.username) {
+        const existing = await User.findOne({ username: cleanUsername });
+        if (existing) {
+          return res.status(400).json({ message: "Ce nom d'utilisateur est déjà utilisé." });
+        }
+        user.username = cleanUsername;
+      }
+    }
+
+    if (email && email.trim()) {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+        return res.status(400).json({ message: "Format d'email invalide." });
+      }
+      if (cleanEmail !== user.email) {
+        const existing = await User.findOne({ email: cleanEmail });
+        if (existing) {
+          return res.status(400).json({ message: "Cet email est déjà associé à un autre compte." });
+        }
+        user.email = cleanEmail;
+      }
+    }
+
+    await user.save();
+    res.status(200).json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      currency: user.currency,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de la mise à jour du profil");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Suppression définitive du compte et de toutes ses données associées (RGPD)
+exports.deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Suppression en cascade de toutes les données liées à ce compte
+    await Promise.all([
+      Transaction.deleteMany({ user: userId }),
+      Budget.deleteMany({ user: userId }),
+      Category.deleteMany({ user: userId }),
+      SavingsGoal.deleteMany({ user: userId }),
+      Debt.deleteMany({ user: userId }),
+      RecurringTransaction.deleteMany({ user: userId }),
+      PushSubscription.deleteMany({ user: userId }),
+      AccountShare.deleteMany({ $or: [{ owner: userId }, { member: userId }] }),
+    ]);
+
+    await User.findByIdAndDelete(userId);
+
+    // Suppression du cookie de session
+    res.cookie("jwt", "", { ...cookieOptions, maxAge: 0 });
+    res.status(200).json({ message: "Compte et données associées supprimés définitivement." });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de la suppression du compte");
     res.status(500).json({ message: "Erreur serveur." });
   }
 };

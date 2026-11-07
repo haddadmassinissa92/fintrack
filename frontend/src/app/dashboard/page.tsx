@@ -2,7 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Download, Upload, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Plus,
+  Download,
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
+  Receipt,
+  PiggyBank,
+  CreditCard,
+  Repeat,
+  ArrowRight,
+} from "lucide-react";
 import ImportTransactions from "@/components/ImportTransactions";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useTransactionStore } from "@/store/useTransactionStore";
@@ -17,13 +29,15 @@ import RecurringTransactions from "@/components/RecurringTransactions";
 import BudgetPlanCard from "@/components/BudgetPlanCard";
 import TransactionList from "@/components/TransactionList";
 import TransactionForm, { type TransactionData } from "@/components/TransactionForm";
-import TransactionFilters from "@/components/TransactionFilters";
+import TransactionFilters, { type Filters } from "@/components/TransactionFilters";
 import UndoToasts from "@/components/UndoToasts";
 import UpcomingBills from "@/components/UpcomingBills";
 import InsightsCards from "@/components/InsightsCards";
 import Debts from "@/components/Debts";
 import SharedAccountBanner, { type ActiveAccount } from "@/components/SharedAccountBanner";
 import { useAccountStore } from "@/store/useAccountStore";
+
+type TabType = "apercu" | "transactions" | "budgets" | "dettes" | "abonnements";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -44,11 +58,23 @@ export default function DashboardPage() {
     getCategories,
     exportTransactions,
   } = useTransactionStore();
+
+  const [activeTab, setActiveTab] = useState<TabType>("apercu");
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionData | null>(null);
   const [formInitialType, setFormInitialType] = useState<"dépense" | "revenu">("dépense");
   const [showImport, setShowImport] = useState(false);
-  const [filters, setFilters] = useState({ search: "", type: "", category: "" });
+  const [filters, setFilters] = useState<Filters>({
+    search: "",
+    type: "",
+    category: "",
+    minAmount: "",
+    maxAmount: "",
+    startDate: "",
+    endDate: "",
+    sortBy: "date",
+    sortOrder: "desc",
+  });
 
   // Raccourcis PWA (voir app/manifest.ts) : /dashboard?add=expense ou
   // ?add=income ouvre directement le formulaire d'ajout. On lit
@@ -149,8 +175,6 @@ export default function DashboardPage() {
   // Compte partagé dont les infos n'ont pas pu être chargées (réseau, serveur) :
   // sans la devise de son propriétaire, afficher ses montants avec la nôtre
   // serait FAUX. On préfère un écran d'erreur à des chiffres mal étiquetés.
-  // (Arriver ici avec activeOwnerId et sans `active` implique que le
-  // chargement a échoué : le garde ci-dessus attend tant qu'il est en cours.)
   if (activeOwnerId && !active) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center">
@@ -177,8 +201,6 @@ export default function DashboardPage() {
 
   // Un compte partagé s'affiche dans la devise de son PROPRIÉTAIRE : ses
   // montants sont enregistrés dans cette devise, pas dans celle du visiteur.
-  // Pour son propre compte, authUser reste la source (il est mis à jour tout de
-  // suite après un changement de devise, contrairement à `active`).
   const currency = (active?.isShared ? active.currency : authUser.currency) || "DZD";
 
   return (
@@ -188,6 +210,7 @@ export default function DashboardPage() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <SharedAccountBanner active={active} onLeave={() => switchTo(null)} />
 
+        {/* En-tête avec message et bouton d'action principal */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold">Bonjour {authUser.username} 👋</h1>
@@ -205,123 +228,249 @@ export default function DashboardPage() {
             className="flex items-center gap-1.5 bg-accent-600 hover:bg-accent-700 text-white rounded-full px-4 py-2 text-sm font-medium transition"
           >
             <Plus size={16} strokeWidth={2.5} />
-            Ajouter
+            Ajouter une transaction
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={goToPrevMonth}
-            aria-label="Mois précédent"
-            className="p-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-accent-600 transition"
-          >
-            <ChevronLeft size={16} strokeWidth={2} />
-          </button>
-          <span className="text-sm font-medium capitalize min-w-[140px] text-center">
-            {monthLabel}
-          </span>
-          <button
-            onClick={goToNextMonth}
-            disabled={isCurrentMonth}
-            aria-label="Mois suivant"
-            className="p-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-accent-600 transition disabled:opacity-30 disabled:hover:text-zinc-500"
-          >
-            <ChevronRight size={16} strokeWidth={2} />
-          </button>
-          {!isCurrentMonth && (
+        {/* Sélecteur de mois & barre d'onglets ergonomique */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+          {/* Navigation par onglets */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
             <button
-              onClick={goToToday}
-              className="text-xs text-accent-600 hover:underline ml-1"
+              onClick={() => setActiveTab("apercu")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                activeTab === "apercu"
+                  ? "bg-accent-600 text-white shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
             >
-              Aujourd&apos;hui
+              <LayoutDashboard size={15} />
+              Aperçu
             </button>
-          )}
+
+            <button
+              onClick={() => setActiveTab("transactions")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                activeTab === "transactions"
+                  ? "bg-accent-600 text-white shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <Receipt size={15} />
+              Transactions
+            </button>
+
+            <button
+              onClick={() => setActiveTab("budgets")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                activeTab === "budgets"
+                  ? "bg-accent-600 text-white shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <PiggyBank size={15} />
+              Budgets & Épargne
+            </button>
+
+            <button
+              onClick={() => setActiveTab("dettes")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                activeTab === "dettes"
+                  ? "bg-accent-600 text-white shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <CreditCard size={15} />
+              Dettes
+            </button>
+
+            <button
+              onClick={() => setActiveTab("abonnements")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                activeTab === "abonnements"
+                  ? "bg-accent-600 text-white shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <Repeat size={15} />
+              Abonnements
+            </button>
+          </div>
+
+          {/* Navigation temporelle (mois) */}
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              onClick={goToPrevMonth}
+              aria-label="Mois précédent"
+              className="p-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-accent-600 transition"
+            >
+              <ChevronLeft size={16} strokeWidth={2} />
+            </button>
+            <span className="text-sm font-medium capitalize min-w-[130px] text-center">
+              {monthLabel}
+            </span>
+            <button
+              onClick={goToNextMonth}
+              disabled={isCurrentMonth}
+              aria-label="Mois suivant"
+              className="p-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-accent-600 transition disabled:opacity-30 disabled:hover:text-zinc-500"
+            >
+              <ChevronRight size={16} strokeWidth={2} />
+            </button>
+            {!isCurrentMonth && (
+              <button
+                onClick={goToToday}
+                className="text-xs text-accent-600 hover:underline ml-1"
+              >
+                Aujourd&apos;hui
+              </button>
+            )}
+          </div>
         </div>
 
-        {stats && (
-          <StatsCards
-            totalIncome={stats.totalIncome}
-            totalExpense={stats.totalExpense}
-            balance={stats.balance}
-            incomeChange={stats.incomeChange}
-            expenseChange={stats.expenseChange}
-            balanceChange={stats.balanceChange}
-            currency={currency}
-          />
+        {/* ======================================================== */}
+        {/* ONGLET 1 : APERÇU GÉNÉRAL (Stats, Alertes, Graphiques) */}
+        {/* ======================================================== */}
+        {activeTab === "apercu" && (
+          <div className="space-y-6">
+            {stats && (
+              <StatsCards
+                totalIncome={stats.totalIncome}
+                totalExpense={stats.totalExpense}
+                balance={stats.balance}
+                incomeChange={stats.incomeChange}
+                expenseChange={stats.expenseChange}
+                balanceChange={stats.balanceChange}
+                currency={currency}
+              />
+            )}
+
+            <UpcomingBills currency={currency} categories={categories.all} />
+            <InsightsCards currency={currency} categories={categories.all} />
+
+            {stats && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CategoryChart
+                  data={stats.byCategory}
+                  currency={currency}
+                  categories={categories.all}
+                />
+                <TrendChart data={stats.monthlyTrend} currency={currency} />
+              </div>
+            )}
+
+            {stats && <BalanceChart data={stats.balanceTrend} currency={currency} />}
+
+            {/* Aperçu rapide des dernières transactions */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold">Dernières transactions</h3>
+                  <p className="text-xs text-zinc-500">Aperçu récent de votre compte</p>
+                </div>
+                <button
+                  onClick={() => setActiveTab("transactions")}
+                  className="flex items-center gap-1 text-xs text-accent-600 hover:underline font-medium"
+                >
+                  Voir tout ({transactions.length})
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+              <TransactionList
+                transactions={transactions.slice(0, 5)}
+                currency={currency}
+                categories={categories.all}
+                onEdit={(t) => setEditingTransaction(t as unknown as TransactionData)}
+              />
+            </div>
+          </div>
         )}
 
-        <UpcomingBills currency={currency} categories={categories.all} />
-        <InsightsCards currency={currency} categories={categories.all} />
+        {/* ======================================================== */}
+        {/* ONGLET 2 : TRANSACTIONS (Filtres, Import/Export, Liste)  */}
+        {/* ======================================================== */}
+        {activeTab === "transactions" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="font-semibold text-lg">Toutes les transactions</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowImport(true)}
+                  className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition"
+                >
+                  <Upload size={13} strokeWidth={2} />
+                  Importer
+                </button>
+                <button
+                  onClick={() => exportTransactions("csv")}
+                  className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition"
+                >
+                  <Download size={13} strokeWidth={2} />
+                  CSV
+                </button>
+                <button
+                  onClick={() => exportTransactions("pdf")}
+                  className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition"
+                >
+                  <Download size={13} strokeWidth={2} />
+                  PDF
+                </button>
+              </div>
+            </div>
 
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <CategoryChart
-              data={stats.byCategory}
+            <TransactionFilters filters={filters} onChange={setFilters} categories={categories} />
+
+            <TransactionList
+              transactions={transactions}
               currency={currency}
               categories={categories.all}
+              onEdit={(t) => setEditingTransaction(t as unknown as TransactionData)}
             />
-            <TrendChart data={stats.monthlyTrend} currency={currency} />
+
+            {hasMore && (
+              <div className="flex justify-center mt-4">
+                <button
+                  onClick={() => loadMoreTransactions()}
+                  disabled={isLoadingMore}
+                  className="text-sm text-zinc-600 dark:text-zinc-300 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2 transition disabled:opacity-50"
+                >
+                  {isLoadingMore ? "Chargement..." : "Charger plus"}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {stats && <BalanceChart data={stats.balanceTrend} currency={currency} />}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SavingsGoals currency={currency} />
-          <BudgetTracker currency={currency} month={viewedMonth} year={viewedYear} />
-        </div>
-
-        <RecurringTransactions currency={currency} />
-        <Debts currency={currency} />
-
-        <BudgetPlanCard currency={currency} />
-
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Transactions</h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowImport(true)}
-                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition"
-              >
-                <Upload size={13} strokeWidth={2} />
-                Importer
-              </button>
-              <button
-                onClick={() => exportTransactions("csv")}
-                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition"
-              >
-                <Download size={13} strokeWidth={2} />
-                CSV
-              </button>
-              <button
-                onClick={() => exportTransactions("pdf")}
-                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition"
-              >
-                <Download size={13} strokeWidth={2} />
-                PDF
-              </button>
+        {/* ======================================================== */}
+        {/* ONGLET 3 : BUDGETS & ÉPARGNE                             */}
+        {/* ======================================================== */}
+        {activeTab === "budgets" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SavingsGoals currency={currency} />
+              <BudgetTracker currency={currency} month={viewedMonth} year={viewedYear} />
             </div>
+            <BudgetPlanCard currency={currency} />
           </div>
-          <TransactionFilters filters={filters} onChange={setFilters} categories={categories} />
-          <TransactionList
-            transactions={transactions}
-            currency={currency}
-            categories={categories.all}
-            onEdit={(t) => setEditingTransaction(t as unknown as TransactionData)}
-          />
-          {hasMore && (
-            <div className="flex justify-center mt-4">
-              <button
-                onClick={() => loadMoreTransactions()}
-                disabled={isLoadingMore}
-                className="text-sm text-zinc-500 hover:text-accent-600 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2 transition disabled:opacity-50"
-              >
-                {isLoadingMore ? "Chargement..." : "Charger plus"}
-              </button>
-            </div>
-          )}
-        </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* ONGLET 4 : DETTES                                        */}
+        {/* ======================================================== */}
+        {activeTab === "dettes" && (
+          <div>
+            <Debts currency={currency} />
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* ONGLET 5 : ABONNEMENTS & TRANSACTIONS RÉCURRENTES        */}
+        {/* ======================================================== */}
+        {activeTab === "abonnements" && (
+          <div>
+            <RecurringTransactions currency={currency} />
+          </div>
+        )}
       </main>
 
       {showForm && (

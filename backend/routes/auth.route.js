@@ -13,6 +13,8 @@ const {
   resetPassword,
   exportAccountData,
   updatePassword,
+  updateProfile,
+  deleteAccount,
 } = require("../controllers/auth.controller");
 const protectRoute = require("../middlewares/protectRoute");
 
@@ -50,6 +52,8 @@ router.post("/logout", logout);
 router.get("/check", protectRoute, checkAuth);
 router.put("/currency", protectRoute, updateCurrency);
 router.put("/password", protectRoute, updatePassword);
+router.put("/profile", protectRoute, updateProfile);
+router.delete("/me", protectRoute, deleteAccount);
 router.get("/export-data", protectRoute, exportAccountData);
 router.post("/forgot-password", authLimiter, forgotPassword);
 router.post("/reset-password/:token", authLimiter, resetPassword);

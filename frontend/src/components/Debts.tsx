@@ -12,6 +12,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useDebtStore } from "@/store/useDebtStore";
+import { useTransactionStore } from "@/store/useTransactionStore";
 import {
   type Debt,
   remainingOf,
@@ -60,6 +61,7 @@ export default function Debts({ currency }: { currency: string }) {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentError, setPaymentError] = useState("");
   const [isPaying, setIsPaying] = useState(false);
+  const [syncTransaction, setSyncTransaction] = useState(false);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showSettled, setShowSettled] = useState(false);
@@ -139,8 +141,21 @@ export default function Debts({ currency }: { currency: string }) {
     setIsPaying(false);
 
     if (result.success) {
+      if (syncTransaction) {
+        const isDebtOwedToMe = debt.direction === "owed_to_me";
+        await useTransactionStore.getState().addTransaction({
+          title: isDebtOwedToMe
+            ? `Remboursement dette de ${debt.person}`
+            : `Remboursement dette à ${debt.person}`,
+          amount: value,
+          type: isDebtOwedToMe ? "revenu" : "dépense",
+          category: isDebtOwedToMe ? "Autre" : "Dettes",
+          date: new Date().toISOString(),
+        });
+      }
       setPayingId(null);
       setPaymentAmount("");
+      setSyncTransaction(false);
     } else {
       setPaymentError(result.message);
     }
@@ -309,6 +324,19 @@ export default function Debts({ currency }: { currency: string }) {
                                 <X size={14} strokeWidth={2} />
                               </button>
                             </div>
+                            <label className="flex items-center gap-1.5 text-xs text-zinc-500 mt-1 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={syncTransaction}
+                                onChange={(e) => setSyncTransaction(e.target.checked)}
+                                className="rounded text-accent-600 focus:ring-accent-500"
+                              />
+                              <span>
+                                {owedToMe
+                                  ? "Ajouter aux transactions (Revenu)"
+                                  : "Déduire de mon solde (Dépense)"}
+                              </span>
+                            </label>
                             {paymentError && (
                               <p className="text-xs text-red-600 mt-1">{paymentError}</p>
                             )}

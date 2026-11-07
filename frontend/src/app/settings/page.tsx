@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings as SettingsIcon, Check, ArrowLeft, Download, Lock, Tag } from "lucide-react";
+import { Settings as SettingsIcon, Check, ArrowLeft, Download, Lock, Tag, User, Trash2 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import Navbar from "@/components/Navbar";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
@@ -22,7 +22,7 @@ const COMMON_CURRENCIES = [
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { authUser, isCheckingAuth, checkAuth, updateCurrency, exportAccountData, updatePassword } = useAuthStore();
+  const { authUser, isCheckingAuth, checkAuth, updateCurrency, exportAccountData, updatePassword, updateProfile, deleteAccount } = useAuthStore();
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState("");
 
@@ -41,6 +41,18 @@ export default function SettingsPage() {
 
   // Gestion des catégories
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+
+  // Modifier le profil
+  const [editUsername, setEditUsername] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Suppression du compte
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -72,6 +84,14 @@ export default function SettingsPage() {
     }
   }, [authUser?.currency]);
 
+  // Pré-remplir les champs profil dès que authUser est disponible
+  useEffect(() => {
+    if (authUser) {
+      setEditUsername(authUser.username || "");
+      setEditEmail(authUser.email || "");
+    }
+  }, [authUser]);
+
   const handleSubmitCurrency = async (e: React.FormEvent) => {
     e.preventDefault();
     const value = (isCustom ? customCurrency : currency).trim().toUpperCase();
@@ -96,6 +116,41 @@ export default function SettingsPage() {
       }
     } else {
       setMessage({ type: "error", text: result.message });
+    }
+  };
+
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileMessage(null);
+    const uname = editUsername.trim();
+    const mail = editEmail.trim();
+    if (!uname || !mail) {
+      setProfileMessage({ type: "error", text: "Le nom d'utilisateur et l'email sont requis." });
+      return;
+    }
+    setProfileLoading(true);
+    const res = await updateProfile(uname, mail);
+    setProfileLoading(false);
+    if (res.success) {
+      setProfileMessage({ type: "success", text: "Profil mis à jour avec succès !" });
+    } else {
+      setProfileMessage({ type: "error", text: res.message });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== authUser?.username) {
+      setDeleteError("Le nom d'utilisateur ne correspond pas.");
+      return;
+    }
+    setDeleteLoading(true);
+    setDeleteError("");
+    const res = await deleteAccount();
+    setDeleteLoading(false);
+    if (res.success) {
+      router.replace("/login");
+    } else {
+      setDeleteError(res.message || "Erreur lors de la suppression.");
     }
   };
 
@@ -322,7 +377,67 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* 4. Exporter les données */}
+        {/* 4. Modifier le profil */}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
+          <h2 className="font-semibold flex items-center gap-2 mb-1">
+            <User size={18} className="text-accent-600" />
+            Mon profil
+          </h2>
+          <p className="text-sm text-zinc-500 mb-4">
+            Modifie ton nom d&apos;utilisateur et ton adresse e-mail.
+          </p>
+
+          <form onSubmit={handleProfileSubmit} className="space-y-3">
+            {profileMessage && (
+              <p
+                className={`text-sm rounded-lg px-3 py-2 ${
+                  profileMessage.type === "success"
+                    ? "bg-accent-50 dark:bg-accent-950/40 text-accent-700 dark:text-accent-400"
+                    : "bg-red-50 dark:bg-red-950/40 text-red-600"
+                }`}
+              >
+                {profileMessage.text}
+              </p>
+            )}
+
+            <div>
+              <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">
+                Nom d&apos;utilisateur
+              </label>
+              <input
+                type="text"
+                required
+                value={editUsername}
+                onChange={(e) => setEditUsername(e.target.value)}
+                className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">
+                Adresse e-mail
+              </label>
+              <input
+                type="email"
+                required
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={profileLoading}
+              className="flex items-center gap-1.5 bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition"
+            >
+              <Check size={15} strokeWidth={2.5} />
+              {profileLoading ? "Mise à jour..." : "Enregistrer le profil"}
+            </button>
+          </form>
+        </div>
+
+        {/* 5. Exporter les données */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
           <h2 className="font-semibold mb-1">Exporter mes données</h2>
           <p className="text-sm text-zinc-500 mb-4">
@@ -349,10 +464,88 @@ export default function SettingsPage() {
         <ShareManager />
 
         <PushNotificationToggle />
+
+        {/* 6. Zone de danger : Suppression du compte */}
+        <div className="bg-red-50/50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-2xl p-5">
+          <h2 className="font-semibold text-red-600 dark:text-red-400 flex items-center gap-2 mb-1">
+            <Trash2 size={18} />
+            Zone de danger
+          </h2>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+            La suppression de ton compte est irréversible. Toutes tes transactions, budgets, objectifs et paramètres seront définitivement effacés conformément au RGPD.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteConfirmText("");
+              setDeleteError("");
+              setShowDeleteModal(true);
+            }}
+            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition"
+          >
+            <Trash2 size={15} />
+            Supprimer définitivement mon compte
+          </button>
+        </div>
       </main>
 
       {showCategoryManager && (
         <CategoryManager onClose={() => setShowCategoryManager(false)} />
+      )}
+
+      {/* Modal de confirmation de suppression */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="p-2 bg-red-100 dark:bg-red-950/50 rounded-xl">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Confirmer la suppression</h3>
+                <p className="text-xs text-zinc-500">Action irréversible</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+              Pour confirmer la suppression de toutes tes données, saisis ton nom d&apos;utilisateur : <span className="font-semibold text-zinc-900 dark:text-white">{authUser?.username}</span>
+            </p>
+
+            {deleteError && (
+              <p className="text-sm bg-red-50 dark:bg-red-950/40 text-red-600 rounded-lg px-3 py-2">
+                {deleteError}
+              </p>
+            )}
+
+            <input
+              type="text"
+              placeholder={authUser?.username || "Ton pseudo"}
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deleteLoading}
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 rounded-lg text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={deleteLoading || deleteConfirmText !== authUser?.username}
+                onClick={handleDeleteAccount}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white transition flex items-center gap-1.5"
+              >
+                {deleteLoading ? "Suppression..." : "Supprimer mon compte"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
