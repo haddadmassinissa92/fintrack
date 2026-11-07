@@ -10,6 +10,7 @@ const Budget = require("../models/budget.model");
 const SavingsGoal = require("../models/savingsGoal.model");
 const RecurringTransaction = require("../models/recurringTransaction.model");
 const Debt = require("../models/debt.model");
+const Wallet = require("../models/wallet.model");
 const PushSubscription = require("../models/pushSubscription.model");
 const AccountShare = require("../models/accountShare.model");
 const {
@@ -262,7 +263,7 @@ exports.exportAccountData = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const [user, transactions, budgets, goals, recurring, categories, debts] = await Promise.all([
+    const [user, transactions, budgets, goals, recurring, categories, debts, wallets] = await Promise.all([
       User.findById(userId).select("-password"),
       Transaction.find({ user: userId }).select("-receiptImage").sort({ date: -1 }),
       Budget.find({ user: userId }),
@@ -270,6 +271,7 @@ exports.exportAccountData = async (req, res) => {
       RecurringTransaction.find({ user: userId }),
       Category.find({ user: userId }),
       Debt.find({ user: userId }),
+      Wallet.find({ user: userId }),
     ]);
 
     const payload = {
@@ -280,6 +282,7 @@ exports.exportAccountData = async (req, res) => {
         currency: user.currency,
         createdAt: user.createdAt,
       },
+      wallets,
       transactions,
       budgets,
       savingsGoals: goals,
@@ -401,6 +404,7 @@ exports.deleteAccount = async (req, res) => {
       Debt.deleteMany({ user: userId }),
       RecurringTransaction.deleteMany({ user: userId }),
       PushSubscription.deleteMany({ user: userId }),
+      Wallet.deleteMany({ user: userId }),
       AccountShare.deleteMany({ $or: [{ owner: userId }, { member: userId }] }),
     ]);
 

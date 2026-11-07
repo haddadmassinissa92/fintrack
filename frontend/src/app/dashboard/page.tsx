@@ -34,8 +34,10 @@ import UndoToasts from "@/components/UndoToasts";
 import UpcomingBills from "@/components/UpcomingBills";
 import InsightsCards from "@/components/InsightsCards";
 import Debts from "@/components/Debts";
+import WalletBar from "@/components/WalletBar";
 import SharedAccountBanner, { type ActiveAccount } from "@/components/SharedAccountBanner";
 import { useAccountStore } from "@/store/useAccountStore";
+import { useWalletStore } from "@/store/useWalletStore";
 
 type TabType = "apercu" | "transactions" | "budgets" | "dettes" | "abonnements";
 
@@ -46,6 +48,7 @@ export default function DashboardPage() {
   // Le store est un fichier .js non typé : sans cette précision, TypeScript
   // infère `null` et refuse tout accès aux champs de `active`
   const active = useAccountStore((state) => state.active) as ActiveAccount | null;
+  const activeWalletId = useWalletStore((state) => state.activeWalletId);
   const {
     transactions,
     stats,
@@ -159,10 +162,15 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!authUser) return;
     const timeout = setTimeout(() => {
-      getTransactions({ ...filters, month: viewedMonth, year: viewedYear });
+      getTransactions({
+        ...filters,
+        wallet: activeWalletId || "",
+        month: viewedMonth,
+        year: viewedYear,
+      });
     }, 300);
     return () => clearTimeout(timeout);
-  }, [authUser, filters, viewedMonth, viewedYear, getTransactions]);
+  }, [authUser, filters, activeWalletId, viewedMonth, viewedYear, getTransactions]);
 
   if (isCheckingAuth || !authUser || (activeOwnerId && !active && !activeError)) {
     return (
@@ -231,6 +239,9 @@ export default function DashboardPage() {
             Ajouter une transaction
           </button>
         </div>
+
+        {/* Barre des Portefeuilles & Comptes */}
+        <WalletBar currency={currency} />
 
         {/* Sélecteur de mois & barre d'onglets ergonomique */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">

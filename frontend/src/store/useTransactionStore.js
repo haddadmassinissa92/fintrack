@@ -99,6 +99,7 @@ export const useTransactionStore = create((set, get) => ({
       if (filters.endDate) params.set("endDate", filters.endDate);
       if (filters.sortBy) params.set("sortBy", filters.sortBy);
       if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
+      if (filters.wallet) params.set("wallet", filters.wallet);
       params.set("page", "1");
 
       const res = await axiosInstance.get(`/transactions?${params.toString()}`);
@@ -135,6 +136,7 @@ export const useTransactionStore = create((set, get) => ({
       if (lastFilters.endDate) params.set("endDate", lastFilters.endDate);
       if (lastFilters.sortBy) params.set("sortBy", lastFilters.sortBy);
       if (lastFilters.sortOrder) params.set("sortOrder", lastFilters.sortOrder);
+      if (lastFilters.wallet) params.set("wallet", lastFilters.wallet);
       params.set("page", String(page + 1));
 
       const res = await axiosInstance.get(`/transactions?${params.toString()}`);

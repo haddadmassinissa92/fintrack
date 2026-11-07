@@ -3,16 +3,19 @@
 import { useState, useEffect } from "react";
 import { Camera, X, Sparkles } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
+import { useWalletStore } from "@/store/useWalletStore";
 import CategoryManager from "./CategoryManager";
 import { predictCategory, type PredictionResult } from "@/lib/categorizer";
 
 export type TransactionData = {
   _id: string;
-  type: "dépense" | "revenu";
+  type: "dépense" | "revenu" | "transfert";
   amount: number;
   category: string;
   description: string;
   date: string;
+  wallet?: any;
+  toWallet?: any;
   receiptImage?: string | null;
 };
 
@@ -53,7 +56,15 @@ export default function TransactionForm({
   transactionToEdit?: TransactionData | null;
 }) {
   const { categories, getCategories, addTransaction, updateTransaction, transactions } = useTransactionStore();
+  const { wallets, activeWalletId } = useWalletStore();
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+
+  const [selectedWalletId, setSelectedWalletId] = useState<string>(() => {
+    if (transactionToEdit?.wallet) {
+      return typeof transactionToEdit.wallet === "object" ? transactionToEdit.wallet._id : transactionToEdit.wallet;
+    }
+    return activeWalletId || (wallets[0]?._id ?? "");
+  });
 
   const [type, setType] = useState<"dépense" | "revenu">(
     transactionToEdit ? transactionToEdit.type : initialType,
@@ -151,6 +162,7 @@ export default function TransactionForm({
         amount: Number(amount),
         category,
         description,
+        wallet: selectedWalletId || null,
         date,
         receiptImage,
       });
@@ -160,6 +172,7 @@ export default function TransactionForm({
         amount: Number(amount),
         category,
         description,
+        wallet: selectedWalletId || null,
         date,
         receiptImage,
       });
@@ -167,6 +180,7 @@ export default function TransactionForm({
     setIsSaving(false);
 
     if (result.success) {
+      useWalletStore.getState().getWallets();
       onClose();
     } else {
       setError(result.message);
@@ -291,6 +305,26 @@ export default function TransactionForm({
             </option>
           ))}
         </select>
+
+        {/* Compte / Portefeuille */}
+        {wallets.length > 0 && (
+          <div className="mb-4">
+            <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">
+              Compte / Portefeuille
+            </label>
+            <select
+              value={selectedWalletId}
+              onChange={(e) => setSelectedWalletId(e.target.value)}
+              className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
+            >
+              {wallets.map((w) => (
+                <option key={w._id} value={w._id}>
+                  {w.name} {w.isDefault ? "(Principal)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Date */}
         <label className="block text-sm mb-1 text-zinc-600 dark:text-zinc-400">Date</label>

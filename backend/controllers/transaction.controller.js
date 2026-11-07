@@ -2,6 +2,7 @@
 
 const Transaction = require("../models/transaction.model");
 const Category = require("../models/category.model");
+const Wallet = require("../models/wallet.model");
 const logger = require("../logger");
 const { buildInsights } = require("../insights.service");
 
@@ -30,10 +31,10 @@ function isValidReceiptImage(receiptImage) {
 
 exports.createTransaction = async (req, res) => {
   try {
-    const { type, amount, category, description, date, receiptImage } = req.body;
+    const { type, amount, category, description, date, receiptImage, wallet, toWallet } = req.body;
 
-    if (!type || !amount || !category) {
-      return res.status(400).json({ message: "Type, montant et catégorie sont requis." });
+    if (!type || !amount) {
+      return res.status(400).json({ message: "Type et montant sont requis." });
     }
     if (amount <= 0) {
       return res.status(400).json({ message: "Le montant doit être positif." });
@@ -42,23 +43,49 @@ exports.createTransaction = async (req, res) => {
       return res.status(400).json({ message: "Image de reçu invalide ou trop volumineuse." });
     }
 
-    // Une catégorie de revenu ne peut pas être utilisée sur une dépense,
-    // et inversement — évite des statistiques faussées plus tard
-    if (!(await isValidCategory(req.user._id, type, category))) {
-      return res.status(400).json({ message: "Catégorie invalide pour ce type de transaction." });
+    // Gestion du type "transfert" vs dépenses/revenus
+    let finalCategory = category;
+    if (type === "transfert") {
+      finalCategory = category || "Virement interne";
+      if (!wallet || !toWallet) {
+        return res.status(400).json({ message: "Comptes source et destination requis pour un virement." });
+      }
+      if (wallet === toWallet) {
+        return res.status(400).json({ message: "Les comptes source et destination doivent être différents." });
+      }
+    } else {
+      if (!category) {
+        return res.status(400).json({ message: "La catégorie est requise." });
+      }
+      if (!(await isValidCategory(req.user._id, type, category))) {
+        return res.status(400).json({ message: "Catégorie invalide pour ce type de transaction." });
+      }
+    }
+
+    // Si aucun portefeuille n'est fourni, associer au portefeuille par défaut
+    let finalWalletId = wallet || null;
+    if (!finalWalletId) {
+      const defaultW = await Wallet.findOne({ user: req.user._id, isDefault: true });
+      if (defaultW) finalWalletId = defaultW._id;
     }
 
     const transaction = await Transaction.create({
       user: req.user._id,
       type,
       amount,
-      category,
+      category: finalCategory,
       description: description?.trim() || "",
+      wallet: finalWalletId,
+      toWallet: type === "transfert" ? toWallet : null,
       date: date ? new Date(date) : new Date(),
       receiptImage: receiptImage || null,
     });
 
-    res.status(201).json(transaction);
+    const populatedTx = await Transaction.findById(transaction._id)
+      .populate("wallet", "name color icon")
+      .populate("toWallet", "name color icon");
+
+    res.status(201).json(populatedTx);
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la création d'une transaction");
     res.status(500).json({ message: "Erreur serveur." });
@@ -72,11 +99,16 @@ exports.createTransaction = async (req, res) => {
 // toutes les transactions d'un coup, même si l'appelant les omet.
 exports.getTransactions = async (req, res) => {
   try {
-    const { month, year, type, category, search, minAmount, maxAmount, startDate, endDate, sortBy, sortOrder } = req.query;
+    const { month, year, type, category, search, minAmount, maxAmount, startDate, endDate, sortBy, sortOrder, wallet } = req.query;
     const filter = { user: req.user._id };
 
     if (type) filter.type = type;
     if (category) filter.category = category;
+
+    // Filtre par portefeuille (compte source ou destination)
+    if (wallet) {
+      filter.$or = [{ wallet: wallet }, { toWallet: wallet }];
+    }
 
     // Recherche texte simple, insensible à la casse, sur la description
     if (search && search.trim()) {
@@ -114,7 +146,12 @@ exports.getTransactions = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const [transactions, total] = await Promise.all([
-      Transaction.find(filter).sort(sortOptions).skip(skip).limit(limit),
+      Transaction.find(filter)
+        .populate("wallet", "name color icon")
+        .populate("toWallet", "name color icon")
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit),
       Transaction.countDocuments(filter),
     ]);
 
@@ -143,7 +180,7 @@ exports.updateTransaction = async (req, res) => {
       return res.status(403).json({ message: "Action non autorisée." });
     }
 
-    const { type, amount, category, description, date, receiptImage } = req.body;
+    const { type, amount, category, description, date, receiptImage, wallet, toWallet } = req.body;
 
     if (type) transaction.type = type;
     if (amount !== undefined) {
@@ -153,13 +190,15 @@ exports.updateTransaction = async (req, res) => {
       transaction.amount = amount;
     }
     if (category) {
-      if (!(await isValidCategory(req.user._id, transaction.type, category))) {
+      if (transaction.type !== "transfert" && !(await isValidCategory(req.user._id, transaction.type, category))) {
         return res.status(400).json({ message: "Catégorie invalide pour ce type de transaction." });
       }
       transaction.category = category;
     }
     if (description !== undefined) transaction.description = description.trim();
     if (date) transaction.date = new Date(date);
+    if (wallet !== undefined) transaction.wallet = wallet || null;
+    if (toWallet !== undefined) transaction.toWallet = toWallet || null;
     // null explicite = l'utilisateur a retiré le reçu ; undefined = champ
     // non envoyé, donc on ne touche pas à la valeur existante
     if (receiptImage !== undefined) {
@@ -170,7 +209,10 @@ exports.updateTransaction = async (req, res) => {
     }
 
     await transaction.save();
-    res.status(200).json(transaction);
+    const populated = await Transaction.findById(transaction._id)
+      .populate("wallet", "name color icon")
+      .populate("toWallet", "name color icon");
+    res.status(200).json(populated);
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la modification d'une transaction");
     res.status(500).json({ message: "Erreur serveur." });

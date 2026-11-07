@@ -1,17 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Pencil, ArrowUpRight, ArrowDownRight, Paperclip, X } from "lucide-react";
+import { Trash2, Pencil, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Paperclip, X } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import { CategoryIcon } from "./categoryIcons";
 
 export type Transaction = {
   _id: string;
-  type: "revenu" | "dépense";
+  type: "revenu" | "dépense" | "transfert";
   amount: number;
   category: string;
   description: string;
   date: string;
+  wallet?: { _id: string; name: string; color: string; icon: string } | null;
+  toWallet?: { _id: string; name: string; color: string; icon: string } | null;
   receiptImage?: string | null;
 };
 
@@ -55,7 +57,11 @@ export default function TransactionList({
         const categoryDoc = categories.find((c) => c.name === t.category && c.type === t.type);
         return (
           <div key={t._id} className="flex items-center gap-3 p-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition">
-            {categoryDoc ? (
+            {t.type === "transfert" ? (
+              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                <ArrowRightLeft size={16} strokeWidth={2} />
+              </div>
+            ) : categoryDoc ? (
               <CategoryIcon icon={categoryDoc.icon} color={categoryDoc.color} size={16} />
             ) : (
               <div
@@ -74,9 +80,26 @@ export default function TransactionList({
             )}
 
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {t.description || t.category}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium truncate">
+                  {t.type === "transfert"
+                    ? t.description || `Virement de ${t.wallet?.name || "Compte"} vers ${t.toWallet?.name || "Compte"}`
+                    : t.description || t.category}
+                </p>
+                {t.wallet && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md font-medium border"
+                    style={{
+                      borderColor: `${t.wallet.color || "#10b981"}40`,
+                      color: t.wallet.color || "#10b981",
+                      backgroundColor: `${t.wallet.color || "#10b981"}15`,
+                    }}
+                  >
+                    {t.wallet.name}
+                    {t.toWallet && ` → ${t.toWallet.name}`}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-zinc-400">
                 {t.category} · {new Date(t.date).toLocaleDateString("fr-FR")}
               </p>
@@ -84,10 +107,14 @@ export default function TransactionList({
 
             <p
               className={`text-sm font-semibold shrink-0 ${
-                t.type === "revenu" ? "text-accent-600" : "text-expense-600"
+                t.type === "transfert"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : t.type === "revenu"
+                  ? "text-accent-600"
+                  : "text-expense-600"
               }`}
             >
-              {t.type === "revenu" ? "+" : "-"}
+              {t.type === "transfert" ? "⇄ " : t.type === "revenu" ? "+" : "-"}
               {t.amount.toLocaleString("fr-FR")} {currency}
             </p>
 
