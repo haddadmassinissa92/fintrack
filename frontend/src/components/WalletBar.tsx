@@ -86,6 +86,19 @@ export default function WalletBar({ currency }: { currency: string }) {
 
   // Menu contextuel
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  // Ferme le menu au scroll / redimensionnement (il est en position fixed)
+  useEffect(() => {
+    if (!menuOpenId) return;
+    const close = () => setMenuOpenId(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [menuOpenId]);
 
   useEffect(() => {
     getWallets();
@@ -306,7 +319,18 @@ export default function WalletBar({ currency }: { currency: string }) {
               <div className="relative ml-1">
                 <button
                   type="button"
-                  onClick={() => setMenuOpenId(menuOpenId === w._id ? null : w._id)}
+                  onClick={(e) => {
+                    if (menuOpenId === w._id) {
+                      setMenuOpenId(null);
+                      return;
+                    }
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setMenuPos({
+                      top: rect.bottom + 4,
+                      left: Math.max(8, rect.right - 128),
+                    });
+                    setMenuOpenId(w._id);
+                  }}
                   className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-md"
                   aria-label="Options du compte"
                 >
@@ -314,7 +338,12 @@ export default function WalletBar({ currency }: { currency: string }) {
                 </button>
 
                 {menuOpenId === w._id && (
-                  <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-20 py-1 text-xs">
+                  <>
+                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpenId(null)} />
+                  <div
+                    style={{ top: menuPos.top, left: menuPos.left }}
+                    className="fixed w-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-50 py-1 text-xs"
+                  >
                     <button
                       onClick={() => openEditModal(w)}
                       className="w-full text-left px-3 py-1.5 flex items-center gap-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-700"
@@ -332,6 +361,7 @@ export default function WalletBar({ currency }: { currency: string }) {
                       </button>
                     )}
                   </div>
+                  </>
                 )}
               </div>
             </div>
