@@ -5,6 +5,7 @@ import { Camera, X, Sparkles } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import { useWalletStore } from "@/store/useWalletStore";
 import CategoryManager from "./CategoryManager";
+import type { WalletItem } from "./WalletBar";
 import { predictCategory, type PredictionResult } from "@/lib/categorizer";
 
 export type TransactionData = {
@@ -67,7 +68,9 @@ export default function TransactionForm({
   });
 
   const [type, setType] = useState<"dépense" | "revenu">(
-    transactionToEdit ? transactionToEdit.type : initialType,
+    transactionToEdit && transactionToEdit.type !== "transfert"
+      ? transactionToEdit.type
+      : initialType,
   );
   const [amount, setAmount] = useState(
     transactionToEdit ? String(transactionToEdit.amount) : "",
@@ -317,7 +320,7 @@ export default function TransactionForm({
               onChange={(e) => setSelectedWalletId(e.target.value)}
               className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
             >
-              {wallets.map((w) => (
+              {wallets.map((w: WalletItem) => (
                 <option key={w._id} value={w._id}>
                   {w.name} {w.isDefault ? "(Principal)" : ""}
                 </option>
