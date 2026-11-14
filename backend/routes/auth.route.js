@@ -15,6 +15,10 @@ const {
   updatePassword,
   updateProfile,
   deleteAccount,
+  verifyLogin2FA,
+  setup2FA,
+  enable2FA,
+  disable2FA,
 } = require("../controllers/auth.controller");
 const protectRoute = require("../middlewares/protectRoute");
 
@@ -57,5 +61,11 @@ router.delete("/me", protectRoute, deleteAccount);
 router.get("/export-data", protectRoute, exportAccountData);
 router.post("/forgot-password", authLimiter, forgotPassword);
 router.post("/reset-password/:token", authLimiter, resetPassword);
+
+// Routes Double Authentification (2FA)
+router.post("/2fa/verify-login", authLimiter, verifyLogin2FA);
+router.post("/2fa/setup", protectRoute, setup2FA);
+router.post("/2fa/enable", protectRoute, enable2FA);
+router.post("/2fa/disable", protectRoute, disable2FA);
 
 module.exports = router;

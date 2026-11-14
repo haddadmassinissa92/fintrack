@@ -22,6 +22,14 @@ const {
 const logger = require("../logger");
 const { sendPasswordResetEmail } = require("../email.service");
 const { convertUserCurrency } = require("../currencyConversion.service");
+const {
+  generateBase32Secret,
+  verifyTOTP,
+  generateBackupCodes,
+  hashBackupCode,
+  verifyBackupCode,
+  buildOtpAuthUrl,
+} = require("../totp.service");
 
 // Génère le jeton JWT (valable 30 jours) et le place dans un cookie
 // httpOnly — jamais lisible en JavaScript côté navigateur, donc protégé
@@ -119,6 +127,20 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Email ou mot de passe incorrect." });
     }
 
+    // Si le 2FA est activé, demander le code avant d'émettre le cookie final
+    if (user.twoFactorEnabled) {
+      const preAuthToken = jwt.sign(
+        { userId: user._id, isPreAuth: true },
+        process.env.JWT_SECRET,
+        { expiresIn: "5m" }
+      );
+      return res.status(200).json({
+        requires2FA: true,
+        preAuthToken,
+        message: "Code d'authentification à deux facteurs requis.",
+      });
+    }
+
     generateTokenAndSetCookie(user._id, user.tokenVersion, res);
 
     res.status(200).json({
@@ -126,9 +148,66 @@ exports.login = async (req, res) => {
       username: user.username,
       email: user.email,
       currency: user.currency,
+      twoFactorEnabled: false,
     });
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la connexion");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Vérifie le code 2FA lors de la connexion pour délivrer la session finale
+exports.verifyLogin2FA = async (req, res) => {
+  try {
+    const { preAuthToken, code } = req.body;
+    if (!preAuthToken || !code) {
+      return res.status(400).json({ message: "Jeton de session et code requis." });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(preAuthToken, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ message: "Session 2FA expirée. Veuillez vous reconnecter." });
+    }
+
+    if (!decoded.isPreAuth || !decoded.userId) {
+      return res.status(401).json({ message: "Jeton 2FA invalide." });
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      return res.status(400).json({ message: "Configuration 2FA introuvable." });
+    }
+
+    const cleanCode = code.trim();
+    let isValid = verifyTOTP(cleanCode, user.twoFactorSecret);
+
+    // Vérifier si c'est un code de secours en cas d'impossibilité d'utiliser l'app TOTP
+    if (!isValid) {
+      const backupCheck = verifyBackupCode(cleanCode, user.twoFactorBackupCodes);
+      if (backupCheck.valid) {
+        isValid = true;
+        user.twoFactorBackupCodes[backupCheck.codeIndex].used = true;
+        await user.save();
+      }
+    }
+
+    if (!isValid) {
+      return res.status(400).json({ message: "Code 2FA ou code de secours incorrect." });
+    }
+
+    generateTokenAndSetCookie(user._id, user.tokenVersion, res);
+
+    res.status(200).json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      currency: user.currency,
+      twoFactorEnabled: true,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de la vérification 2FA");
     res.status(500).json({ message: "Erreur serveur." });
   }
 };
@@ -415,6 +494,104 @@ exports.deleteAccount = async (req, res) => {
     res.status(200).json({ message: "Compte et données associées supprimés définitivement." });
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la suppression du compte");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Initialisation de la configuration 2FA (génération du secret Base32 et URI pour l'app)
+exports.setup2FA = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    const tempSecret = generateBase32Secret(32);
+    user.twoFactorTempSecret = tempSecret;
+    await user.save();
+
+    const otpauthUrl = buildOtpAuthUrl({
+      username: user.username,
+      secret: tempSecret,
+      issuer: "FinTrack",
+    });
+
+    res.status(200).json({
+      secret: tempSecret,
+      otpauthUrl,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de l'initialisation du 2FA");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Validation et activation définitive du 2FA avec fourniture des codes de secours
+exports.enable2FA = async (req, res) => {
+  try {
+    const { token } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user.twoFactorTempSecret) {
+      return res.status(400).json({ message: "Aucune configuration 2FA en attente. Veuillez relancer l'activation." });
+    }
+
+    const isValid = verifyTOTP(token, user.twoFactorTempSecret);
+    if (!isValid) {
+      return res.status(400).json({ message: "Code à 6 chiffres incorrect. Vérifiez l'heure de votre appareil." });
+    }
+
+    const backupCodes = generateBackupCodes(8);
+    user.twoFactorEnabled = true;
+    user.twoFactorSecret = user.twoFactorTempSecret;
+    user.twoFactorTempSecret = null;
+    user.twoFactorBackupCodes = backupCodes.map((code) => ({
+      codeHash: hashBackupCode(code),
+      used: false,
+    }));
+    await user.save();
+
+    res.status(200).json({
+      message: "Authentification à deux facteurs activée avec succès !",
+      backupCodes,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de l'activation du 2FA");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Désactivation sécurisée du 2FA (exige mot de passe et code 2FA/secours)
+exports.disable2FA = async (req, res) => {
+  try {
+    const { password, token } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user.twoFactorEnabled) {
+      return res.status(400).json({ message: "Le 2FA n'est pas activé." });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Mot de passe incorrect." });
+    }
+
+    const cleanCode = (token || "").trim();
+    let isCodeValid = verifyTOTP(cleanCode, user.twoFactorSecret);
+    if (!isCodeValid) {
+      const backupCheck = verifyBackupCode(cleanCode, user.twoFactorBackupCodes);
+      if (backupCheck.valid) isCodeValid = true;
+    }
+
+    if (!isCodeValid) {
+      return res.status(400).json({ message: "Code 2FA ou code de secours incorrect." });
+    }
+
+    user.twoFactorEnabled = false;
+    user.twoFactorSecret = null;
+    user.twoFactorTempSecret = null;
+    user.twoFactorBackupCodes = [];
+    await user.save();
+
+    res.status(200).json({ message: "Double authentification désactivée avec succès." });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de la désactivation du 2FA");
     res.status(500).json({ message: "Erreur serveur." });
   }
 };

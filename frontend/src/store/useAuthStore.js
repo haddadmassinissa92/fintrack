@@ -34,6 +34,19 @@ export const useAuthStore = create((set, get) => ({
   login: async (email, password) => {
     try {
       const res = await axiosInstance.post("/auth/login", { email, password });
+      if (res.data.requires2FA) {
+        return { success: true, requires2FA: true, preAuthToken: res.data.preAuthToken };
+      }
+      set({ authUser: res.data });
+      return { success: true, requires2FA: false };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
+  verifyLogin2FA: async (preAuthToken, code) => {
+    try {
+      const res = await axiosInstance.post("/auth/2fa/verify-login", { preAuthToken, code });
       set({ authUser: res.data });
       return { success: true };
     } catch (error) {
@@ -117,6 +130,35 @@ export const useAuthStore = create((set, get) => ({
       const res = await axiosInstance.put("/auth/currency", { currency });
       set({ authUser: { ...get().authUser, currency: res.data.currency } });
       return { success: true, rate: res.data.rate, from: res.data.from, to: res.data.to };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
+  setup2FA: async () => {
+    try {
+      const res = await axiosInstance.post("/auth/2fa/setup");
+      return { success: true, secret: res.data.secret, otpauthUrl: res.data.otpauthUrl };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
+  enable2FA: async (token) => {
+    try {
+      const res = await axiosInstance.post("/auth/2fa/enable", { token });
+      set({ authUser: { ...get().authUser, twoFactorEnabled: true } });
+      return { success: true, backupCodes: res.data.backupCodes, message: res.data.message };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || "Erreur" };
+    }
+  },
+
+  disable2FA: async (password, token) => {
+    try {
+      const res = await axiosInstance.post("/auth/2fa/disable", { password, token });
+      set({ authUser: { ...get().authUser, twoFactorEnabled: false } });
+      return { success: true, message: res.data.message };
     } catch (error) {
       return { success: false, message: error.response?.data?.message || "Erreur" };
     }

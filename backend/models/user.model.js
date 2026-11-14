@@ -56,6 +56,26 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // Authentification à double facteur (2FA / TOTP)
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    twoFactorSecret: {
+      type: String,
+      default: null,
+    },
+    twoFactorTempSecret: {
+      type: String,
+      default: null,
+    },
+    twoFactorBackupCodes: [
+      {
+        codeHash: { type: String, required: true },
+        used: { type: Boolean, default: false },
+      },
+    ],
   },
   { timestamps: true },
 );
