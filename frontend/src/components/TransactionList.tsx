@@ -54,7 +54,10 @@ export default function TransactionList({
         // Une transaction ne stocke que le NOM de sa catégorie : on
         // retrouve ici l'icône/couleur correspondantes. Si la catégorie a
         // été supprimée depuis, on retombe sur la flèche d'avant.
-        const categoryDoc = categories.find((c) => c.name === t.category && c.type === t.type);
+        const categoryDoc =
+          t.type !== "transfert"
+            ? categories.find((c) => c.name === t.category && c.type === (t.type as "revenu" | "dépense"))
+            : undefined;
         return (
           <div key={t._id} className="flex items-center gap-3 p-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition">
             {t.type === "transfert" ? (

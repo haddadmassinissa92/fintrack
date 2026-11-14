@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { ComponentType } from "react";
 import {
   Wallet as WalletIcon,
   Plus,
@@ -11,17 +12,18 @@ import {
   CreditCard,
   MoreVertical,
   X,
-  Check,
   Trash2,
   Pencil,
 } from "lucide-react";
 import { useWalletStore } from "@/store/useWalletStore";
 import { useTransactionStore } from "@/store/useTransactionStore";
 
+export type WalletType = "courant" | "epargne" | "especes" | "investissement" | "autre";
+
 export type WalletItem = {
   _id: string;
   name: string;
-  type: "courant" | "epargne" | "especes" | "investissement" | "autre";
+  type: WalletType;
   initialBalance: number;
   balance: number;
   color: string;
@@ -29,7 +31,7 @@ export type WalletItem = {
   isDefault: boolean;
 };
 
-const WALLET_ICONS: Record<string, any> = {
+const WALLET_ICONS: Record<WalletType, ComponentType<{ size?: number; className?: string }>> = {
   courant: CreditCard,
   epargne: PiggyBank,
   especes: Banknote,
@@ -86,26 +88,13 @@ export default function WalletBar({ currency }: { currency: string }) {
 
   // Menu contextuel
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-
-  // Ferme le menu au scroll / redimensionnement (il est en position fixed)
-  useEffect(() => {
-    if (!menuOpenId) return;
-    const close = () => setMenuOpenId(null);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
-    return () => {
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
-    };
-  }, [menuOpenId]);
 
   useEffect(() => {
     getWallets();
   }, [getWallets]);
 
   // Solde total consolidé
-  const totalBalance = wallets.reduce((acc: number, w: WalletItem) => acc + (w.balance || 0), 0);
+  const totalBalance = wallets.reduce((acc, w) => acc + (w.balance || 0), 0);
 
   const openAddModal = () => {
     setEditingWallet(null);
@@ -275,7 +264,7 @@ export default function WalletBar({ currency }: { currency: string }) {
         </button>
 
         {/* Cartes des portefeuilles individuels */}
-        {wallets.map((w: WalletItem) => {
+        {wallets.map((w) => {
           const IconComponent = WALLET_ICONS[w.type] || WalletIcon;
           const isSelected = activeWalletId === w._id;
 
@@ -319,18 +308,7 @@ export default function WalletBar({ currency }: { currency: string }) {
               <div className="relative ml-1">
                 <button
                   type="button"
-                  onClick={(e) => {
-                    if (menuOpenId === w._id) {
-                      setMenuOpenId(null);
-                      return;
-                    }
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setMenuPos({
-                      top: rect.bottom + 4,
-                      left: Math.max(8, rect.right - 128),
-                    });
-                    setMenuOpenId(w._id);
-                  }}
+                  onClick={() => setMenuOpenId(menuOpenId === w._id ? null : w._id)}
                   className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-md"
                   aria-label="Options du compte"
                 >
@@ -338,12 +316,7 @@ export default function WalletBar({ currency }: { currency: string }) {
                 </button>
 
                 {menuOpenId === w._id && (
-                  <>
-                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpenId(null)} />
-                  <div
-                    style={{ top: menuPos.top, left: menuPos.left }}
-                    className="fixed w-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-50 py-1 text-xs"
-                  >
+                  <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-20 py-1 text-xs">
                     <button
                       onClick={() => openEditModal(w)}
                       className="w-full text-left px-3 py-1.5 flex items-center gap-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-700"
@@ -361,7 +334,6 @@ export default function WalletBar({ currency }: { currency: string }) {
                       </button>
                     )}
                   </div>
-                  </>
                 )}
               </div>
             </div>
@@ -412,7 +384,7 @@ export default function WalletBar({ currency }: { currency: string }) {
                 </label>
                 <select
                   value={walletType}
-                  onChange={(e) => setWalletType(e.target.value as any)}
+                  onChange={(e) => setWalletType(e.target.value as WalletType)}
                   className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
                 >
                   <option value="courant">Compte Courant</option>
@@ -514,7 +486,7 @@ export default function WalletBar({ currency }: { currency: string }) {
                   onChange={(e) => setFromWalletId(e.target.value)}
                   className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
                 >
-                  {wallets.map((w: WalletItem) => (
+                  {wallets.map((w) => (
                     <option key={w._id} value={w._id}>
                       {w.name} ({formatAmount(w.balance || 0, currency)})
                     </option>
@@ -531,7 +503,7 @@ export default function WalletBar({ currency }: { currency: string }) {
                   onChange={(e) => setToWalletId(e.target.value)}
                   className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
                 >
-                  {wallets.map((w: WalletItem) => (
+                  {wallets.map((w) => (
                     <option key={w._id} value={w._id}>
                       {w.name} ({formatAmount(w.balance || 0, currency)})
                     </option>

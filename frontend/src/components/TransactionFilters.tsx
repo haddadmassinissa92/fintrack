@@ -13,6 +13,7 @@ export type Filters = {
   endDate?: string;
   sortBy?: string;
   sortOrder?: string;
+  wallet?: string;
 };
 
 export default function TransactionFilters({
