@@ -14,6 +14,7 @@ import {
   CreditCard,
   Repeat,
   ArrowRight,
+  BarChart3,
 } from "lucide-react";
 import ImportTransactions from "@/components/ImportTransactions";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -35,11 +36,12 @@ import UpcomingBills from "@/components/UpcomingBills";
 import InsightsCards from "@/components/InsightsCards";
 import Debts from "@/components/Debts";
 import WalletBar from "@/components/WalletBar";
+import AnalyticsReports from "@/components/AnalyticsReports";
 import SharedAccountBanner, { type ActiveAccount } from "@/components/SharedAccountBanner";
 import { useAccountStore } from "@/store/useAccountStore";
 import { useWalletStore } from "@/store/useWalletStore";
 
-type TabType = "apercu" | "transactions" | "budgets" | "dettes" | "abonnements";
+type TabType = "apercu" | "transactions" | "budgets" | "dettes" | "abonnements" | "analyses";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -306,6 +308,18 @@ export default function DashboardPage() {
               <Repeat size={15} />
               Abonnements
             </button>
+
+            <button
+              onClick={() => setActiveTab("analyses")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                activeTab === "analyses"
+                  ? "bg-accent-600 text-white shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <BarChart3 size={15} />
+              Analyses & Rapports
+            </button>
           </div>
 
           {/* Navigation temporelle (mois) */}
@@ -480,6 +494,19 @@ export default function DashboardPage() {
         {activeTab === "abonnements" && (
           <div>
             <RecurringTransactions currency={currency} />
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* ONGLET 6 : ANALYSES & RAPPORTS AVANCÉS                   */}
+        {/* ======================================================== */}
+        {activeTab === "analyses" && (
+          <div>
+            <AnalyticsReports
+              currentMonth={viewedMonth}
+              currentYear={viewedYear}
+              currency={currency}
+            />
           </div>
         )}
       </main>

@@ -7,6 +7,8 @@ const {
   updateTransaction,
   deleteTransaction,
   getStats,
+  getMonthComparison,
+  getAnnualReport,
   exportTransactions,
   importTransactions,
   getInsights,
@@ -19,6 +21,8 @@ const router = express.Router();
 router.use(protectDataRoute);
 
 router.get("/stats", getStats);
+router.get("/comparison", getMonthComparison);
+router.get("/annual-report", getAnnualReport);
 router.get("/insights", getInsights);
 router.get("/export", exportTransactions);
 router.get("/", getTransactions);

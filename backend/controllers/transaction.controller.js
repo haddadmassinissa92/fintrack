@@ -5,6 +5,7 @@ const Category = require("../models/category.model");
 const Wallet = require("../models/wallet.model");
 const logger = require("../logger");
 const { buildInsights } = require("../insights.service");
+const { buildMonthComparison, buildAnnualReport } = require("../analytics.service");
 
 // Vérifie qu'une catégorie donnée existe bien parmi les catégories de cet
 // utilisateur, pour ce type précis (revenu/dépense) — les catégories
@@ -451,6 +452,113 @@ exports.getStats = async (req, res) => {
     });
   } catch (error) {
     logger.error({ err: error }, "Erreur lors du calcul des statistiques");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Comparatif détaillé Mois par Mois (M vs M-1 par catégorie)
+exports.getMonthComparison = async (req, res) => {
+  try {
+    const userId = req.dataOwnerId || req.user._id;
+    const { month, year } = req.query;
+    const now =
+      month && year
+        ? new Date(Number(year), Number(month) - 1, 1)
+        : new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const [currentAgg, prevAgg] = await Promise.all([
+      Transaction.aggregate([
+        {
+          $match: {
+            user: userId,
+            type: { $ne: "transfert" },
+            date: { $gte: startOfMonth, $lt: startOfNextMonth },
+          },
+        },
+        {
+          $group: {
+            _id: { type: "$type", category: "$category" },
+            total: { $sum: "$amount" },
+          },
+        },
+      ]),
+      Transaction.aggregate([
+        {
+          $match: {
+            user: userId,
+            type: { $ne: "transfert" },
+            date: { $gte: startOfPrevMonth, $lt: startOfMonth },
+          },
+        },
+        {
+          $group: {
+            _id: { type: "$type", category: "$category" },
+            total: { $sum: "$amount" },
+          },
+        },
+      ]),
+    ]);
+
+    const currentExpenses = {};
+    const currentIncomes = {};
+    for (const item of currentAgg) {
+      if (item._id.type === "dépense") {
+        currentExpenses[item._id.category || "Autre"] = item.total;
+      } else if (item._id.type === "revenu") {
+        currentIncomes[item._id.category || "Autre"] = item.total;
+      }
+    }
+
+    const prevExpenses = {};
+    const prevIncomes = {};
+    for (const item of prevAgg) {
+      if (item._id.type === "dépense") {
+        prevExpenses[item._id.category || "Autre"] = item.total;
+      } else if (item._id.type === "revenu") {
+        prevIncomes[item._id.category || "Autre"] = item.total;
+      }
+    }
+
+    const comparison = buildMonthComparison({
+      currentExpenses,
+      currentIncomes,
+      prevExpenses,
+      prevIncomes,
+    });
+
+    res.status(200).json({
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+      ...comparison,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors du calcul du comparatif mensuel");
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+// Bilan annuel récapitulatif ("FinTrack Wrapped")
+exports.getAnnualReport = async (req, res) => {
+  try {
+    const userId = req.dataOwnerId || req.user._id;
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year + 1, 0, 1);
+
+    const transactions = await Transaction.find({
+      user: userId,
+      date: { $gte: startDate, $lt: endDate },
+    })
+      .sort({ date: 1 })
+      .lean();
+
+    const report = buildAnnualReport({ year, transactions });
+    res.status(200).json(report);
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors du calcul du bilan annuel");
     res.status(500).json({ message: "Erreur serveur." });
   }
 };
