@@ -94,7 +94,7 @@ export default function WalletBar({ currency }: { currency: string }) {
   }, [getWallets]);
 
   // Solde total consolidé
-  const totalBalance = wallets.reduce((acc, w) => acc + (w.balance || 0), 0);
+  const totalBalance = wallets.reduce((acc: number, w: WalletItem) => acc + (w.balance || 0), 0);
 
   const openAddModal = () => {
     setEditingWallet(null);
@@ -264,7 +264,7 @@ export default function WalletBar({ currency }: { currency: string }) {
         </button>
 
         {/* Cartes des portefeuilles individuels */}
-        {wallets.map((w) => {
+        {wallets.map((w: WalletItem) => {
           const IconComponent = WALLET_ICONS[w.type] || WalletIcon;
           const isSelected = activeWalletId === w._id;
 
@@ -486,7 +486,7 @@ export default function WalletBar({ currency }: { currency: string }) {
                   onChange={(e) => setFromWalletId(e.target.value)}
                   className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
                 >
-                  {wallets.map((w) => (
+                  {wallets.map((w: WalletItem) => (
                     <option key={w._id} value={w._id}>
                       {w.name} ({formatAmount(w.balance || 0, currency)})
                     </option>
@@ -503,7 +503,7 @@ export default function WalletBar({ currency }: { currency: string }) {
                   onChange={(e) => setToWalletId(e.target.value)}
                   className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
                 >
-                  {wallets.map((w) => (
+                  {wallets.map((w: WalletItem) => (
                     <option key={w._id} value={w._id}>
                       {w.name} ({formatAmount(w.balance || 0, currency)})
                     </option>
