@@ -14,8 +14,8 @@ export type TransactionData = {
   category: string;
   description: string;
   date: string;
-  wallet?: string | { _id: string };
-  toWallet?: string | { _id: string };
+  wallet?: any;
+  toWallet?: any;
   receiptImage?: string | null;
 };
 
@@ -317,7 +317,7 @@ export default function TransactionForm({
               onChange={(e) => setSelectedWalletId(e.target.value)}
               className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
             >
-              {wallets.map((w: { _id: string; name: string; isDefault?: boolean }) => (
+              {wallets.map((w) => (
                 <option key={w._id} value={w._id}>
                   {w.name} {w.isDefault ? "(Principal)" : ""}
                 </option>

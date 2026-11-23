@@ -246,9 +246,9 @@ export default function DashboardPage() {
         <WalletBar currency={currency} />
 
         {/* Sélecteur de mois & barre d'onglets ergonomique */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
-          {/* Navigation par onglets */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+          {/* Navigation par onglets avec retour à la ligne automatique */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => setActiveTab("apercu")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
@@ -323,7 +323,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Navigation temporelle (mois) */}
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 self-start sm:self-end lg:self-center shrink-0 pt-1 lg:pt-0">
             <button
               onClick={goToPrevMonth}
               aria-label="Mois précédent"

@@ -209,6 +209,29 @@ export const useTransactionStore = create((set, get) => ({
   addTransaction: async (data) => {
     try {
       const res = await axiosInstance.post("/transactions", data);
+
+      // Si la réponse est 202 (mis en file hors-ligne par le SW),
+      // on ajoute une transaction "fantôme" avec un flag offlineQueued
+      // pour l'afficher immédiatement dans la liste sans attendre la sync.
+      if (res.status === 202) {
+        const queued = {
+          _id: `offline-${Date.now()}`,
+          ...data,
+          offlineQueued: true,
+          createdAt: new Date().toISOString(),
+          date: data.date || new Date().toISOString(),
+        };
+        set({
+          transactions: [queued, ...get().transactions],
+          total: get().total + 1,
+        });
+        return {
+          success: true,
+          queued: true,
+          message: res.data?.message || "Sauvegardée hors ligne.",
+        };
+      }
+
       set({
         transactions: [res.data, ...get().transactions],
         total: get().total + 1,
