@@ -49,8 +49,8 @@ export default function DashboardPage() {
   const { activeOwnerId, activeError, getActive, switchTo } = useAccountStore();
   // Le store est un fichier .js non typé : sans cette précision, TypeScript
   // infère `null` et refuse tout accès aux champs de `active`
-  const active = useAccountStore((state) => state.active) as ActiveAccount | null;
-  const activeWalletId = useWalletStore((state) => state.activeWalletId);
+  const active = useAccountStore((state: any) => state.active) as ActiveAccount | null;
+  const activeWalletId = useWalletStore((state: any) => state.activeWalletId) as string | null;
   const {
     transactions,
     stats,

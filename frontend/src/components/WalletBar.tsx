@@ -54,6 +54,25 @@ function formatAmount(amount: number, currency: string) {
   return `${amount.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency}`;
 }
 
+type WalletInput = {
+  name: string;
+  type: WalletType;
+  initialBalance: number;
+  color: string;
+};
+
+type WalletActionResult = {
+  success: boolean;
+  message?: string;
+};
+
+type WalletTransferInput = {
+  fromWalletId: string;
+  toWalletId: string;
+  amount: number;
+  description: string;
+};
+
 export default function WalletBar({ currency }: { currency: string }) {
   const {
     wallets,
@@ -64,7 +83,16 @@ export default function WalletBar({ currency }: { currency: string }) {
     updateWallet,
     deleteWallet,
     transferBetweenWallets,
-  } = useWalletStore();
+  } = useWalletStore() as {
+    wallets: WalletItem[];
+    activeWalletId: string | null;
+    setActiveWalletId: (id: string | null) => void;
+    getWallets: () => Promise<void>;
+    createWallet: (data: WalletInput) => Promise<WalletActionResult>;
+    updateWallet: (id: string, data: WalletInput) => Promise<WalletActionResult>;
+    deleteWallet: (id: string) => Promise<WalletActionResult>;
+    transferBetweenWallets: (data: WalletTransferInput) => Promise<WalletActionResult>;
+  };
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingWallet, setEditingWallet] = useState<WalletItem | null>(null);
@@ -94,7 +122,7 @@ export default function WalletBar({ currency }: { currency: string }) {
   }, [getWallets]);
 
   // Solde total consolidé
-  const totalBalance = wallets.reduce((acc, w) => acc + (w.balance || 0), 0);
+  const totalBalance = (wallets || []).reduce((acc: number, w: WalletItem) => acc + (w.balance || 0), 0);
 
   const openAddModal = () => {
     setEditingWallet(null);
@@ -164,7 +192,7 @@ export default function WalletBar({ currency }: { currency: string }) {
       useTransactionStore.getState().getTransactions(useTransactionStore.getState().lastFilters);
       useTransactionStore.getState().getStats(useTransactionStore.getState().statsMonthYear || {});
     } else {
-      setWalletError(res.message);
+      setWalletError(res.message ?? "Une erreur est survenue.");
     }
   };
 
@@ -209,7 +237,7 @@ export default function WalletBar({ currency }: { currency: string }) {
       useTransactionStore.getState().getTransactions(useTransactionStore.getState().lastFilters);
       useTransactionStore.getState().getStats(useTransactionStore.getState().statsMonthYear || {});
     } else {
-      setTransferError(res.message);
+      setTransferError(res.message ?? "");
     }
   };
 
@@ -264,8 +292,8 @@ export default function WalletBar({ currency }: { currency: string }) {
         </button>
 
         {/* Cartes des portefeuilles individuels */}
-        {wallets.map((w) => {
-          const IconComponent = WALLET_ICONS[w.type] || WalletIcon;
+        {wallets.map((w: WalletItem) => {
+          const IconComponent = (w.type && WALLET_ICONS[w.type as WalletType]) || WalletIcon;
           const isSelected = activeWalletId === w._id;
 
           return (
@@ -486,7 +514,7 @@ export default function WalletBar({ currency }: { currency: string }) {
                   onChange={(e) => setFromWalletId(e.target.value)}
                   className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
                 >
-                  {wallets.map((w) => (
+                  {wallets.map((w: WalletItem) => (
                     <option key={w._id} value={w._id}>
                       {w.name} ({formatAmount(w.balance || 0, currency)})
                     </option>
@@ -503,7 +531,7 @@ export default function WalletBar({ currency }: { currency: string }) {
                   onChange={(e) => setToWalletId(e.target.value)}
                   className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
                 >
-                  {wallets.map((w) => (
+                  {wallets.map((w: WalletItem) => (
                     <option key={w._id} value={w._id}>
                       {w.name} ({formatAmount(w.balance || 0, currency)})
                     </option>

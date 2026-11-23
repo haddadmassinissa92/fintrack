@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Camera, X, Sparkles } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import { useWalletStore } from "@/store/useWalletStore";
+import type { WalletItem } from "./WalletBar";
 import CategoryManager from "./CategoryManager";
 import { predictCategory, type PredictionResult } from "@/lib/categorizer";
 
@@ -56,7 +57,10 @@ export default function TransactionForm({
   transactionToEdit?: TransactionData | null;
 }) {
   const { categories, getCategories, addTransaction, updateTransaction, transactions } = useTransactionStore();
-  const { wallets, activeWalletId } = useWalletStore();
+  const { wallets, activeWalletId } = useWalletStore() as {
+    wallets: WalletItem[];
+    activeWalletId: string | null;
+  };
   const [showCategoryManager, setShowCategoryManager] = useState(false);
 
   const [selectedWalletId, setSelectedWalletId] = useState<string>(() => {
@@ -317,7 +321,7 @@ export default function TransactionForm({
               onChange={(e) => setSelectedWalletId(e.target.value)}
               className="w-full border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-accent-500"
             >
-              {wallets.map((w) => (
+              {wallets.map((w: WalletItem) => (
                 <option key={w._id} value={w._id}>
                   {w.name} {w.isDefault ? "(Principal)" : ""}
                 </option>
