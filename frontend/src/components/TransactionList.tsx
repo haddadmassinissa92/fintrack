@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Pencil, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Paperclip, X } from "lucide-react";
+import { Trash2, Pencil, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Paperclip, X, CloudOff } from "lucide-react";
 import { useTransactionStore } from "@/store/useTransactionStore";
 import { CategoryIcon } from "./categoryIcons";
 
@@ -15,6 +15,7 @@ export type Transaction = {
   wallet?: { _id: string; name: string; color: string; icon: string } | null;
   toWallet?: { _id: string; name: string; color: string; icon: string } | null;
   receiptImage?: string | null;
+  offlineQueued?: boolean;
 };
 
 type CategoryDoc = {
@@ -100,6 +101,12 @@ export default function TransactionList({
                   >
                     {t.wallet.name}
                     {t.toWallet && ` → ${t.toWallet.name}`}
+                  </span>
+                )}
+                {t.offlineQueued && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                    <CloudOff size={11} />
+                    En attente de sync
                   </span>
                 )}
               </div>

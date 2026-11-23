@@ -31,6 +31,27 @@ export type WalletItem = {
   isDefault: boolean;
 };
 
+type CreateWalletData = {
+  name: string;
+  type: WalletType;
+  initialBalance: number;
+  color: string;
+};
+
+type UpdateWalletData = CreateWalletData;
+
+type TransferWalletData = {
+  fromWalletId: string;
+  toWalletId: string;
+  amount: number;
+  description: string;
+};
+
+type WalletMutationResult = {
+  success: boolean;
+  message?: string;
+};
+
 const WALLET_ICONS: Record<WalletType, ComponentType<{ size?: number; className?: string }>> = {
   courant: CreditCard,
   epargne: PiggyBank,
@@ -54,25 +75,6 @@ function formatAmount(amount: number, currency: string) {
   return `${amount.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency}`;
 }
 
-type WalletInput = {
-  name: string;
-  type: WalletType;
-  initialBalance: number;
-  color: string;
-};
-
-type WalletActionResult = {
-  success: boolean;
-  message?: string;
-};
-
-type WalletTransferInput = {
-  fromWalletId: string;
-  toWalletId: string;
-  amount: number;
-  description: string;
-};
-
 export default function WalletBar({ currency }: { currency: string }) {
   const {
     wallets,
@@ -88,10 +90,10 @@ export default function WalletBar({ currency }: { currency: string }) {
     activeWalletId: string | null;
     setActiveWalletId: (id: string | null) => void;
     getWallets: () => Promise<void>;
-    createWallet: (data: WalletInput) => Promise<WalletActionResult>;
-    updateWallet: (id: string, data: WalletInput) => Promise<WalletActionResult>;
-    deleteWallet: (id: string) => Promise<WalletActionResult>;
-    transferBetweenWallets: (data: WalletTransferInput) => Promise<WalletActionResult>;
+    createWallet: (data: CreateWalletData) => Promise<WalletMutationResult>;
+    updateWallet: (id: string, data: UpdateWalletData) => Promise<WalletMutationResult>;
+    deleteWallet: (id: string) => Promise<WalletMutationResult>;
+    transferBetweenWallets: (data: TransferWalletData) => Promise<WalletMutationResult>;
   };
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -237,7 +239,7 @@ export default function WalletBar({ currency }: { currency: string }) {
       useTransactionStore.getState().getTransactions(useTransactionStore.getState().lastFilters);
       useTransactionStore.getState().getStats(useTransactionStore.getState().statsMonthYear || {});
     } else {
-      setTransferError(res.message ?? "");
+      setTransferError(res.message || "Le virement a échoué.");
     }
   };
 

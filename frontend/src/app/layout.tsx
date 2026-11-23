@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
+import OfflineIndicator from "@/components/OfflineIndicator";
 
 // Police Google chargée localement par Next.js (pas de requête externe au
 // chargement de la page, tout est intégré au build) — bien plus soignée
@@ -84,6 +85,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <RegisterServiceWorker />
+        <OfflineIndicator />
         {children}
       </body>
     </html>
