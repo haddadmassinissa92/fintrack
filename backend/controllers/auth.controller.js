@@ -57,7 +57,16 @@ const generateTokenAndSetCookie = (userId, tokenVersion, res) => {
     ...cookieOptions,
     maxAge: 30 * 24 * 60 * 60 * 1000,
   });
+
+  return token;
 };
+
+// Une application mobile envoie l'en-tête "X-Client: mobile" : elle n'a pas de
+// cookie fiable, donc on lui renvoie AUSSI le jeton dans le corps de la
+// réponse (à stocker dans le coffre sécurisé du téléphone). Le site web, lui,
+// ne reçoit jamais le jeton dans le corps : il reste dans le cookie httpOnly.
+const withMobileToken = (req, token, payload) =>
+  req.get("x-client") === "mobile" ? { ...payload, token } : payload;
 
 exports.signup = async (req, res) => {
   try {
@@ -100,14 +109,16 @@ exports.signup = async (req, res) => {
     ];
     await Category.insertMany(defaultCategories);
 
-    generateTokenAndSetCookie(newUser._id, newUser.tokenVersion, res);
+    const token = generateTokenAndSetCookie(newUser._id, newUser.tokenVersion, res);
 
-    res.status(201).json({
-      _id: newUser._id,
-      username: newUser.username,
-      email: newUser.email,
-      currency: newUser.currency,
-    });
+    res.status(201).json(
+      withMobileToken(req, token, {
+        _id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        currency: newUser.currency,
+      }),
+    );
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de l'inscription");
     res.status(500).json({ message: "Erreur serveur." });
@@ -141,15 +152,17 @@ exports.login = async (req, res) => {
       });
     }
 
-    generateTokenAndSetCookie(user._id, user.tokenVersion, res);
+    const token = generateTokenAndSetCookie(user._id, user.tokenVersion, res);
 
-    res.status(200).json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      currency: user.currency,
-      twoFactorEnabled: false,
-    });
+    res.status(200).json(
+      withMobileToken(req, token, {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        currency: user.currency,
+        twoFactorEnabled: false,
+      }),
+    );
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la connexion");
     res.status(500).json({ message: "Erreur serveur." });
@@ -197,15 +210,17 @@ exports.verifyLogin2FA = async (req, res) => {
       return res.status(400).json({ message: "Code 2FA ou code de secours incorrect." });
     }
 
-    generateTokenAndSetCookie(user._id, user.tokenVersion, res);
+    const token = generateTokenAndSetCookie(user._id, user.tokenVersion, res);
 
-    res.status(200).json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      currency: user.currency,
-      twoFactorEnabled: true,
-    });
+    res.status(200).json(
+      withMobileToken(req, token, {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        currency: user.currency,
+        twoFactorEnabled: true,
+      }),
+    );
   } catch (error) {
     logger.error({ err: error }, "Erreur lors de la vérification 2FA");
     res.status(500).json({ message: "Erreur serveur." });

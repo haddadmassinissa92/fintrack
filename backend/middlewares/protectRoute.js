@@ -11,7 +11,12 @@ const logger = require("../logger");
 
 const protectRoute = async (req, res, next) => {
   try {
-    const token = req.cookies.jwt;
+    // Navigateur : cookie httpOnly. Application mobile : en-tête
+    // "Authorization: Bearer <jeton>" (un téléphone n'a pas de cookie fiable).
+    // Le jeton est le même JWT dans les deux cas, vérifié exactement pareil.
+    const authHeader = req.get("authorization") || "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+    const token = req.cookies.jwt || bearerToken;
     if (!token) {
       return res.status(401).json({ message: "Non autorisé, connecte-toi." });
     }
